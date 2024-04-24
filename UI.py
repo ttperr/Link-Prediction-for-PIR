@@ -113,28 +113,30 @@ class Ui_Widget(object):
 
 
     def run_query(self):
-        print(self.lineEdit.text())
-        print(self.lineEdit_2.text())
+        #print(self.lineEdit.text())
+        #print(self.lineEdit_2.text())
         if(self.lineEdit_2.text()==""):
             self.lineEdit_2.setStyleSheet("color:red;")
             print("No user selected. Run again after selecting a user.")
             return
+        if(self.PIR.is_new_user(self.lineEdit_2.text())):
+            print("New user!")
         query_results=self.PIR.query(self.lineEdit.text(),self.lineEdit_2.text())
         self.display_query_results(query_results)
 
     def display_query_results(self,query_results):
         pass
-    
+
     def update_user(self):
         if(self.lineEdit_2!=""):
             self.lineEdit_2.setStyleSheet("border:0px;")
         else:
             self.lineEdit_2.setStyleSheet("color:black;")
             return
-        print(self.lineEdit_2.text())
+        #print(self.lineEdit_2.text())
         if(self.PIR.is_new_user(self.lineEdit_2.text())):
             self.lineEdit_2.setStyleSheet("color:green;")
-            print("New user!")
+            #print("New user!")
         else:
             self.lineEdit_2.setStyleSheet("color:black;")
 
