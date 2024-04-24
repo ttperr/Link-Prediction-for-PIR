@@ -53,7 +53,6 @@ def main():
     if(arguments.l):
         index_in_ElasticSearch(arguments.d)
 
-    ## THIS IS JUST TO HAVE SOMETHING TO TEST ON FOR NOW, UNTIL THE GUI IS COMPLETE
     pir=PIR(arguments.d)
     app = QApplication(sys.argv)
     widget = Widget(pir)
