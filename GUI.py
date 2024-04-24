@@ -2,7 +2,7 @@ import argparse
 import sys
 from indexer import index_in_ElasticSearch
 import Reranker
-import connecter
+import connector
 
 class GUI(object):
     def __init__(self,dataset):
@@ -12,7 +12,7 @@ class GUI(object):
         else:
             raise NotImplementedError("Unknown dataset")
 
-        self.client = connecter.establish_connection()
+        self.client = connector.establish_connection()
 
         self.reranker=Reranker.Reranker(dataset) #In future we can add flags initializing different rerankers (graph, contents,...)
 

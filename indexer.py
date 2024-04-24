@@ -1,12 +1,12 @@
 from tqdm import tqdm
 import csv
 import requests
-import connecter
+import connector
 
 #Loads data in the ElasticSearch engine
 def index_in_ElasticSearch(dataset):
-    
-    client = connecter.establish_connection()
+
+    client = connector.establish_connection()
 
     if dataset=="AOL":
         client.options(ignore_status=[400, 404]).indices.delete(index='aol4ps')

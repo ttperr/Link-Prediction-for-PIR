@@ -2,7 +2,7 @@ AOL4PS/*
 !datasets/AOL4PS/SETUP.md
 datasets/AOL4PS/*.csv
 datasets/AOL4PS/README.md
-connecter.py
+connector.py
 
 # Created by https://www.toptal.com/developers/gitignore/api/java,intellij+all,python,macos,windows,linux,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=java,intellij+all,python,macos,windows,linux,visualstudiocode
