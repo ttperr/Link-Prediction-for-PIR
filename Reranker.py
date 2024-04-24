@@ -16,4 +16,11 @@ class Reranker(object):
             res.append((doc,score*np.random.rand()))
         #NO NEED TO SORT THEM AT THE END, I'LL DO THAT IN THE GUI 
         return res
-    
+
+    def is_new_user(self,userID):
+        #Must return true if the userId is new, false if it is known
+
+        #JUST RANDOM FOR NOW
+        if np.random.rand()>0.5:
+            return True
+        return False

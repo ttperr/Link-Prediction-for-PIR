@@ -4,7 +4,10 @@ from indexer import index_in_ElasticSearch
 import Reranker
 import connector
 
-class GUI(object):
+from UI import Ui_Widget
+from PySide6.QtWidgets import QApplication, QWidget
+
+class PIR(object):
     def __init__(self,dataset):
         self.dataset=dataset
         if(dataset=="AOL"):
@@ -16,18 +19,31 @@ class GUI(object):
 
         self.reranker=Reranker.Reranker(dataset) #In future we can add flags initializing different rerankers (graph, contents,...)
 
-    def query(self,search_text):
+    def is_new_user(self,userId):
+        return self.reranker.is_new_user(userId)
+    
+    def query(self,search_text,user):
+        results=self.query_es(search_text)
+        clean_results=self.clean_query(results)
+        print("ElasticSearch results")
+        print(clean_results)
+        reranked_results=self.reranker.rerank(search_text,clean_results,user)
+        print("Reranked results")
+        print(reranked_results)
+        return reranked_results #TODO
+    
+    def query_es(self,search_text):
         if self.dataset=="AOL":
             return self.client.search(index=self.index,query={"match":{"title":search_text}})
         return None
     def clean_query(self,query_result):
         return([(a["_id"],a["_score"]) for a in query_result["hits"]["hits"]])
 
-    
-
-
-
-
+class Widget(QWidget):
+    def __init__(self,PIR, parent=None):
+        super().__init__(parent)
+        self.ui = Ui_Widget()
+        self.ui.setupUi(self,PIR)
 
 def main():
     parser = argparse.ArgumentParser(description="Personalized Information Retrieval project")
@@ -38,17 +54,16 @@ def main():
         index_in_ElasticSearch(arguments.d)
 
     ## THIS IS JUST TO HAVE SOMETHING TO TEST ON FOR NOW, UNTIL THE GUI IS COMPLETE
-    gui=GUI(arguments.d)
-    text = input("QUERY: (write 'q' to quit)\n")
-    while(text!="q"):
-        results=gui.query(text)
-        print("ElasticSearch values")
-        print(gui.clean_query(results))
-        print("Reranked results")
-        print(gui.reranker.rerank(text,gui.clean_query(results),"WRITE HERE THE USER ID YU ARE TESTING"))
-        text=input("QUERY: (write 'q' to quit)\n")
+    pir=PIR(arguments.d)
+    app = QApplication(sys.argv)
+    widget = Widget(pir)
+    widget.show()
+    sys.exit(app.exec())
+
 
 
 
 if __name__ =="__main__":
     main()
+
+
