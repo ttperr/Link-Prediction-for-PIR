@@ -27,12 +27,12 @@ class PIR(object):
     
     def query(self,search_text,user):
         results=self.query_es(search_text)
-        print(results)
+        #print(results)
         clean_results=self.clean_query(results)
-        print("ElasticSearch results")
+        print("ElasticSearch results (ordered)")
         print(clean_results)
         reranked_results=self.reranker.rerank(search_text,clean_results,user)
-        print("Reranked results")
+        print("Reranked results (ordered)")
         reranked_results.sort(key=lambda a:a[1],reverse=True)
         print(reranked_results)
         out_results=[]
@@ -53,10 +53,23 @@ class PIR(object):
         if self.dataset=="AOL":
             return self.client.search(index=self.index,query={"match":{"title":search_text}},size=self.n_docs)
         return None
+    
     def clean_query(self,query_result):
         return([(a["_id"],a["_score"]) for a in query_result["hits"]["hits"]])
+    
     def register_click(self,doc_ids,user_id,doc_clicked_index,query_text):
-        self.reranker.register_click(doc_ids,user_id,doc_clicked_index,query_text)
+        #doc_ids is a sorted list of [docid1, docid2], ordered from best to worst matching
+        #user_id is the user id
+        #doc_clicked_index is the index of the document clicked. From 0 (the best matching) to len(doc_ids)-1 (worst matching) 
+        #query_text is the query text.
+        print("doc_ids",doc_ids)
+        print("user_id",user_id)
+        print("doc_clicked_index",doc_clicked_index)
+        print("query_text",query_text)
+
+        #TODO pass needed values to self.reranker to update the logs
+
+
 class Widget(QWidget):
     def __init__(self,PIR,n, parent=None):
         super().__init__(parent)

@@ -1,7 +1,6 @@
 import csv
 import numpy as np
 from tqdm import tqdm
-from util import parseCsv
 
 class Reranker(object):
 

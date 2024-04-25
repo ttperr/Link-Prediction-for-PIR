@@ -182,7 +182,6 @@ class Ui_Widget(object):
     def register_click(self,res_ind):
         if res_ind<len(self.last_query_results):
             self.PIR.register_click([doc[1] for doc in self.last_query_results],self.lineEdit_2.text(),res_ind,self.lineEdit.text())
-            #register_click(self,doc_ids,user_id,doc_clicked_index,query_text)
 
 ##STOP CUSTOM CODE
 
