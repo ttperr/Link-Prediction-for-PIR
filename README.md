@@ -9,6 +9,7 @@ To run the code run from the terminal ``PIR.py``.
 Flags:
 + ``-d \[AOL\]`` to change the dataset. If not specified, AOL4PS is used.
 + ``-l`` to index the chosen dataset into ElasticSearch. Should be done the first run only.
++ ``-n <integer>`` to specify the maximum number of files you are interested in. 
 
 
 ## Connector (TO DO: IN FINAL VERSION PUT THE CONNECTOR WITH FAKE PARAMS)
