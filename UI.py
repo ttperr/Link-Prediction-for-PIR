@@ -15,12 +15,12 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QGridLayout, QLayout, QLineEdit,
-    QScrollArea, QSizePolicy, QSpacerItem, QWidget)
+from PySide6.QtWidgets import (QAbstractScrollArea, QApplication, QGridLayout, QLayout,
+    QLineEdit, QPushButton, QScrollArea, QSizePolicy,
+    QSpacerItem, QVBoxLayout, QWidget)
 
 class Ui_Widget(object):
-    def setupUi(self, Widget,PIR):
-        self.PIR=PIR
+    def setupUi(self, Widget,PIR,n_docs):
         if not Widget.objectName():
             Widget.setObjectName(u"Widget")
         Widget.resize(960, 540)
@@ -69,24 +69,49 @@ class Ui_Widget(object):
 
         self.gridLayout.addWidget(self.lineEdit_2, 1, 2, 1, 1)
 
-        self.scrollArea = QScrollArea(Widget)
-        self.scrollArea.setObjectName(u"scrollArea")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        sizePolicy1.setHorizontalStretch(0)
-        sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.scrollArea.sizePolicy().hasHeightForWidth())
-        self.scrollArea.setSizePolicy(sizePolicy1)
-        self.scrollArea.setWidgetResizable(True)
-        self.scrollAreaWidgetContents = QWidget()
-        self.scrollAreaWidgetContents.setObjectName(u"scrollAreaWidgetContents")
-        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 490, 366))
-        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
-
-        self.gridLayout.addWidget(self.scrollArea, 2, 1, 1, 2)
-
         self.verticalSpacer_3 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         self.gridLayout.addItem(self.verticalSpacer_3, 3, 0, 1, 1)
+
+        self.scrollArea = QScrollArea(Widget)
+        self.scrollArea.setObjectName(u"scrollArea")
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scrollArea.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollArea.setAlignment(Qt.AlignHCenter|Qt.AlignTop)
+        self.scrollAreaWidgetContents = QWidget()
+        self.scrollAreaWidgetContents.setObjectName(u"scrollAreaWidgetContents")
+        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 490, 366))
+        self.verticalLayout = QVBoxLayout(self.scrollAreaWidgetContents)
+        self.verticalLayout.setObjectName(u"verticalLayout")
+        '''
+        self.pushButton = QPushButton(self.scrollAreaWidgetContents)
+        self.pushButton.setObjectName(u"pushButton")
+
+        self.verticalLayout.addWidget(self.pushButton)
+
+        self.pushButton_2 = QPushButton(self.scrollAreaWidgetContents)
+        self.pushButton_2.setObjectName(u"pushButton_2")
+
+        self.verticalLayout.addWidget(self.pushButton_2)
+        '''
+        font2 = QFont()
+        font2.setPointSize(14)
+        font2.setKerning(True)
+        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
+        sizePolicy1.setHorizontalStretch(0)
+        sizePolicy1.setVerticalStretch(0)
+        for i in range(n_docs):
+            button=QPushButton(self.scrollAreaWidgetContents)
+            button.setObjectName(u"pushButton_"+str(i))
+            button.setFlat(True)
+            button.setFont(font2)
+            sizePolicy1.setHeightForWidth(button.sizePolicy().hasHeightForWidth())
+            button.setSizePolicy(sizePolicy1)
+            self.verticalLayout.addWidget(button)
+        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
+
+        self.gridLayout.addWidget(self.scrollArea, 2, 1, 1, 2)
 
         self.gridLayout.setRowStretch(0, 1)
         self.gridLayout.setRowStretch(1, 2)
@@ -107,10 +132,11 @@ class Ui_Widget(object):
     
 ##FROM HERE ON CUSTOM CODE
         #still inside setupUi
+        self.PIR=PIR
         self.lineEdit.returnPressed.connect(self.run_query)
         self.lineEdit_2.returnPressed.connect(self.update_user)
         self.lineEdit_2.textEdited.connect(self.update_user)
-
+        #self.textEdit.selectionChanged.connect(self.selected_doc)
 
     def run_query(self):
         #print(self.lineEdit.text())
@@ -125,7 +151,11 @@ class Ui_Widget(object):
         self.display_query_results(query_results)
 
     def display_query_results(self,query_results):
-        pass
+        for i in range(len(query_results)):
+            text=query_results[i][0] #TODO: better display
+            self.verticalLayout.itemAt(i).widget().setText(text)
+        for i in range(len(query_results),self.verticalLayout.count()):
+            self.verticalLayout.itemAt(i).widget().setText("VUOTO")
 
     def update_user(self):
         if(self.lineEdit_2!=""):
