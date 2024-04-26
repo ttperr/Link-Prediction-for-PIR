@@ -20,7 +20,7 @@ class Reranker(object):
             return []
         queryID = self.getQueryID(query_text)
         # return self.PClick(queryID, query_results, user)
-        return self.common_neighbors_ranking(user, query_results)
+        return self.graph_metric_ranking(user, query_results)
 
     def is_new_user(self,userID):
         #Must return true if the userId is new, false if it is known
@@ -94,15 +94,13 @@ class Reranker(object):
             res.append((resultID, newScore))
         return res
     
-    def common_neighbors_ranking(self, user, documents):
-        """
-        Basic link prediction metric calculated on the user-document graph
-        paper: https://onlinelibrary.wiley.com/doi/10.1002/asi.20591
-        """
-        ranking_ratio = 1
+    def graph_metric_ranking(self, user, documents):
+        ranking_ratio = 0.7
         res=[]
         for document, score in documents:
-            new_score = score * (1 - ranking_ratio) + self.user_document.common_neighbors(user, document) * ranking_ratio
+            metric = self.user_document.common_neighbors(user, document)
+            # metric = self.user_document.adamic_adar(user, document)
+            # metric = self.user_document.rooted_page_rank(user, document)
+            new_score = score * (1 - ranking_ratio) + metric * ranking_ratio
             res.append((document, new_score))
         return res
-            
