@@ -57,7 +57,7 @@ class PIR(object):
 
     def query_es(self, search_text):
         if self.dataset == "AOL":
-            return self.client.search(index=self.index, query={"match": {"title": search_text}}, size=self.n_docs)
+            return self.client.search(index=self.index, query={"match": {"title": {"query": search_text, "fuzziness": "AUTO"}}}, size=self.n_docs)
         return None
 
     def clean_query(self, query_result):
