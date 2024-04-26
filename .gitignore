@@ -2,6 +2,7 @@ AOL4PS/*
 !datasets/AOL4PS/SETUP.md
 datasets/AOL4PS/*.csv
 datasets/AOL4PS/README.md
+datasets/Delicious/*
 connector.py
 
 # Created by https://www.toptal.com/developers/gitignore/api/java,intellij+all,python,macos,windows,linux,visualstudiocode
