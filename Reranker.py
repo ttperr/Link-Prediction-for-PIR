@@ -5,8 +5,9 @@ from graph import Graph
 
 class Reranker(object):
 
-    def __init__(self,dataset):
+    def __init__(self,dataset,validation=False):
         self.dataset = dataset
+        self.validation=validation
         if dataset=="AOL":
             #YOU SHOULD LOAD VARIABLES/USEFUL INFO FROM LOGS OR A FILE STORING THEM (IF YOU USE FILES, STORE THEM IN THE CORRECT FOLDER)
             #THE FOLDER with data and files needed to rerank SHOULD BE in  AOL4PS/ 
@@ -22,7 +23,7 @@ class Reranker(object):
         # return self.PClick(queryID, query_results, user)
         return self.graph_metric_ranking(user, query_results)
 
-    def is_new_user(self,userID):
+    def is_new_user(self,userID): #TODO
         #Must return true if the userId is new, false if it is known
 
         #JUST RANDOM FOR NOW
@@ -54,7 +55,10 @@ class Reranker(object):
     def generate_user_document_graph(self):
         res = Graph()
         if self.dataset=="AOL":
-            with open('datasets/AOL4PS/data.csv') as f:
+            doc='datasets/AOL4PS/data.csv'
+            if self.validation:
+                doc='datasets/AOL4PS/training_data.csv'
+            with open(doc) as f:
                 reader = csv.reader(f, delimiter='\t')
                 firstRow = True
                 pbar = tqdm(reader, desc='Parsing queries', unit='rows')

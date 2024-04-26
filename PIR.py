@@ -21,7 +21,7 @@ class PIR(object):
 
         self.client = connector.establish_connection()
 
-        self.reranker=Reranker.Reranker(dataset) #In future we can add flags initializing different rerankers (graph, contents,...)
+        self.reranker=Reranker.Reranker(dataset,validation) #In future we can add flags initializing different rerankers (graph, contents,...)
 
     def is_new_user(self,userId):
         return self.reranker.is_new_user(userId)
