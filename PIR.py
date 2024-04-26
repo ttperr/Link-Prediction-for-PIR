@@ -8,9 +8,10 @@ import connector
 
 from UI import Ui_Widget
 from PySide6.QtWidgets import QApplication, QWidget
+import datasets.AOL4PS.splitter as AOL_splitter
 
 class PIR(object):
-    def __init__(self,dataset,n_docs):
+    def __init__(self,dataset,n_docs,validation=False):
         self.dataset=dataset
         self.n_docs=n_docs
         if(dataset=="AOL"):
@@ -81,11 +82,13 @@ def main():
     parser.add_argument("-l",default=False,action='store_true',help="Load data to ElasticSearch")
     parser.add_argument("-d",type=str,default="AOL",help="Specify the dataset type. All parameters associated to dataset are hardcoded")
     parser.add_argument("-n",type=int,default=25,help="Specify the maximum number of docs you want to return each search")
+    parser.add_argument("-v",default=False,action="store_true",help="Specify if you are performing validation")
     arguments = parser.parse_args()
     if(arguments.l):
         index_in_ElasticSearch(arguments.d)
-
-    pir=PIR(arguments.d,arguments.n)
+    if(arguments.v and arguments.d=="AOL"):
+        AOL_splitter.validation_split()
+    pir=PIR(arguments.d,arguments.n,arguments.v)
     app = QApplication(sys.argv)
     widget = Widget(pir,arguments.n)
     widget.show()
