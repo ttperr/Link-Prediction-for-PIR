@@ -44,9 +44,7 @@ class PIR(object):
             # FASTER ways to do it, but since we have few results this is fine.
             for new_pos in range(len(reranked_results)):
                 for old_pos in range(len(reranked_results)):
-                    pass  # TODO
                     if (reranked_results[new_pos][0] == clean_results[old_pos][0]):
-
                         doc = results["hits"]["hits"][old_pos]
                         out_results.append(
                             (old_pos-new_pos, doc["_id"], doc["_source"]["url"], doc["_source"]["title"]))
