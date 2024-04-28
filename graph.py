@@ -95,3 +95,5 @@ class Graph(object):
                 if node == target_node:
                     hits+=1
         return hits/nb_steps
+    
+    

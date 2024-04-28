@@ -108,3 +108,9 @@ class Reranker(object):
             new_score = score * (1 - ranking_ratio) + metric * ranking_ratio
             res.append((document, new_score))
         return res
+    
+    
+
+
+    
+
