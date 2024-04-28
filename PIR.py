@@ -5,7 +5,8 @@ import sys
 from indexer import index_in_elasticsearch
 import Reranker
 import connector
-
+import csv
+from tqdm import tqdm
 from UI import Ui_Widget
 from PySide6.QtWidgets import QApplication, QWidget
 import datasets.AOL4PS.splitter as AOL_splitter
@@ -24,6 +25,8 @@ class PIR(object):
 
         # In future we can add flags initializing different rerankers (graph, contents,...)
         self.reranker = Reranker.Reranker(dataset, validation)
+        if validation:
+            self.evaluate()
 
     def is_new_user(self, userId):
         return self.reranker.is_new_user(userId)
@@ -72,7 +75,57 @@ class PIR(object):
         print("query_text", query_text)
 
         # TODO pass needed values to self.reranker to update the logs
+    
+    def evaluate(self):
+        count=0
+        relevant_retrieved_by_ES=0
+        if self.dataset=="AOL":
+            with open('datasets/AOL4PS/validation_data.csv') as f, open('datasets/AOL4PS/query.csv','r') as q:
+                queries=q.readlines()
+                reader = csv.reader(f, delimiter='\t')
+                firstRow = True
+                pbar = tqdm(reader, desc='Validation', unit='rows')
+                for row in pbar:
+                    if firstRow:
+                        firstRow = False
+                        continue
+                    log_rankings=row[6].split()
+                    rank_in_log=int(row[7])+1
+                    relevant_doc=row[5]
+                    query_text=(queries[int(row[1][2:])+1]).split("\t")[0]
+                    ES_rankings=self.clean_query(self.query_es(query_text))
+                    if(len(ES_rankings)>0):
+                        ES_with_ties,rank_in_ES=self.aggregate_ties_finding_relevant(ES_rankings,relevant_doc)
+                        #print(relevant_doc)
+                        #print(ES_rankings)
+                        #print(self.aggregate_ties_finding_relevant(ES_rankings,relevant_doc))
+                        relevant_retrieved_by_ES+=1
+                        count+=1
+            print(count,"validation samples.")
+            print(relevant_retrieved_by_ES,"times ES managed to retrieve the relevant doc.")
+        else:
+            raise NotImplementedError("Unknown dataset")
+        pass
 
+    def aggregate_ties_finding_relevant(self,clean_query_result,relevant_doc_id):
+        result=[]
+        tmp=[clean_query_result[0][0]]
+        prev_score=clean_query_result[0][1]
+        rank=-1
+        if(clean_query_result[0][0]==relevant_doc_id):
+            rank=1
+        
+        for t in range(1,len(clean_query_result)):
+            if(clean_query_result[t][0]==relevant_doc_id):
+                rank=len(result)+1
+            if(clean_query_result[t][1]==prev_score):
+                tmp.append(clean_query_result[t][0])
+            else:
+                prev_score=clean_query_result[t][1]
+                result.append(tmp.copy())
+                tmp=[clean_query_result[t][0]]
+        result.append(tmp)
+        return result,rank
 
 class Widget(QWidget):
     def __init__(self, PIR, n, parent=None):
