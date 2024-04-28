@@ -10,6 +10,7 @@ class Reranker(object):
     def __init__(self,dataset,validation=False):
         self.dataset = dataset
         self.validation=validation
+        self.ranking_ratio = 1
         if dataset=="AOL":
             #YOU SHOULD LOAD VARIABLES/USEFUL INFO FROM LOGS OR A FILE STORING THEM (IF YOU USE FILES, STORE THEM IN THE CORRECT FOLDER)
             #THE FOLDER with data and files needed to rerank SHOULD BE in  AOL4PS/ 
@@ -23,8 +24,11 @@ class Reranker(object):
             return []
         queryID = self.getQueryID(query_text)
         # return self.PClick(queryID, query_results, user)
-        # return self.graph_metric_ranking(user, query_results)
-        return self.graph_page_rank_metric(user, query_results)
+        return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.shortest_distance)
+        return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.weighted_shortest_distance)
+        return self.graph_metric(user, query_results, self.user_document.common_neighbors)
+        return self.graph_metric(user, query_results, self.user_document.adamic_adar)
+        return self.user_document_page_rank(user, query_results)
 
     def is_new_user(self,userID): #TODO
         #Must return true if the userId is new, false if it is known
@@ -82,24 +86,55 @@ class Reranker(object):
             res.append((resultID, newScore))
         return res
     
-    def graph_metric_ranking(self, user, documents):
-        ranking_ratio = 0.7
-        res=[]
-        for document, score in documents:
-            # metric = 1 / self.user_document.shortest_distance(user, document)
-            # metric = 1 / self.user_document.weighted_shortest_distance(user, document)
-            # metric = self.user_document.common_neighbors(user, document)
-            metric = self.user_document.adamic_adar(user, document)
-            new_score = score * (1 - ranking_ratio) + metric * ranking_ratio
-            res.append((document, new_score))
-        return res
+    def graph_metric(self, user, documents, metric):
+        return [self.combine_score(document, lambda d: metric(user, d)) for document in documents]
 
-    def graph_page_rank_metric(self, user, documents):
-        ranking_ratio = 1
-        res=[]
+    def user_document_page_rank(self, user, documents):
         pagerank_scores = self.user_document.rooted_page_rank(user, documents)
-        for d, pagerank_score in zip(documents, pagerank_scores):
-            document, score = d
-            new_score = score * (1 - ranking_ratio) + pagerank_score * ranking_ratio
-            res.append((document, new_score))
+        return [self.combine_score(doc_and_score, pagerank) for doc_and_score, pagerank in zip(documents, pagerank_scores)]
+
+    def combine_score(self, doc_and_score, metric):
+        document, score = doc_and_score
+        if callable(metric):
+            return score * (1 - self.ranking_ratio) + metric(document) * self.ranking_ratio
+        return score * (1 - self.ranking_ratio) + metric * self.ranking_ratio
+
+    def graph_features(self, query, user, documents, session=None):
+        tmp = self.ranking_ratio
+        self.ranking_ratio = 1
+        res = np.matrix(
+            self.graph_metric(user, documents, lambda u,d: self.user_document.degree(u)),
+            self.graph_metric(user, documents, lambda u,d: self.user_document.degree(d)),
+            self.graph_metric(user, documents, lambda u,d: 1/self.user_document.shortest_distance(u, d)),
+            self.graph_metric(user, documents, lambda u,d: 1/self.user_document.weighted_shortest_distance(u, d)),
+            self.graph_metric(user, documents, self.user_document.common_neighbors),
+            self.graph_metric(user, documents, self.user_document.adamic_adar),
+            self.user_document_page_rank(user, documents),
+            self.graph_metric(session, documents, lambda u,d: self.session_document.degree(u)),
+            self.graph_metric(session, documents, lambda u,d: self.session_document.degree(d)),
+            self.graph_metric(session, documents, lambda u,d: 1/self.session_document.shortest_distance(u, d)),
+            self.graph_metric(session, documents, lambda u,d: 1/self.session_document.weighted_shortest_distance(u, d)),
+            self.graph_metric(session, documents, self.session_document.common_neighbors),
+            self.graph_metric(session, documents, self.session_document.adamic_adar),
+            self.session_document_page_rank(session, documents),
+            self.graph_metric(user, [(query, 0)], lambda u,d: self.user_query.degree(u)),
+            self.graph_metric(user, [(query, 0)], lambda u,d: self.user_query.degree(d)),
+            self.graph_metric(user, [(query, 0)], lambda u,d: 1/self.user_query.shortest_distance(u, d)),
+            self.graph_metric(user, [(query, 0)], lambda u,d: 1/self.user_query.weighted_shortest_distance(u, d)),
+            self.graph_metric(user, [(query, 0)], self.user_query.common_neighbors),
+            self.graph_metric(user, [(query, 0)], self.user_query.adamic_adar),
+            self.graph_metric(session, [(query, 0)], lambda u,d: self.session_query.degree(u)),
+            self.graph_metric(session, [(query, 0)], lambda u,d: self.session_query.degree(d)),
+            self.graph_metric(session, [(query, 0)], lambda u,d: 1/self.session_query.shortest_distance(u, d)),
+            self.graph_metric(session, [(query, 0)], lambda u,d: 1/self.session_query.weighted_shortest_distance(u, d)),
+            self.graph_metric(session, [(query, 0)], self.session_query.common_neighbors),
+            self.graph_metric(session, [(query, 0)], self.session_query.adamic_adar),
+            self.graph_metric(query, documents, lambda u,d: self.query_document.degree(u)),
+            self.graph_metric(query, documents, lambda u,d: self.query_document.degree(d)),
+            self.graph_metric(query, documents, lambda u,d: 1/self.query_document.shortest_distance(u, d)),
+            self.graph_metric(query, documents, lambda u,d: 1/self.query_document.weighted_shortest_distance(u, d)),
+            self.graph_metric(query, documents, self.query_document.common_neighbors),
+            self.graph_metric(query, documents, self.query_document.adamic_adar)
+        )
+        self.ranking_ratio = tmp
         return res
