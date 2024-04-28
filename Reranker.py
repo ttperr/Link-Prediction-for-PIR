@@ -5,13 +5,15 @@ from graph import Graph
 
 class Reranker(object):
 
+    #TODO: framework computation to get feature matrix
+
     def __init__(self,dataset,validation=False):
         self.dataset = dataset
         self.validation=validation
         if dataset=="AOL":
             #YOU SHOULD LOAD VARIABLES/USEFUL INFO FROM LOGS OR A FILE STORING THEM (IF YOU USE FILES, STORE THEM IN THE CORRECT FOLDER)
             #THE FOLDER with data and files needed to rerank SHOULD BE in  AOL4PS/ 
-            self.user_document = self.generate_user_document_graph()
+            self.user_document = Graph(0, 5, self.validation, dataset=self.dataset, name="user-document")
             
         else:
             raise NotImplementedError("Unknown dataset")
@@ -21,7 +23,8 @@ class Reranker(object):
             return []
         queryID = self.getQueryID(query_text)
         # return self.PClick(queryID, query_results, user)
-        return self.graph_metric_ranking(user, query_results)
+        # return self.graph_metric_ranking(user, query_results)
+        return self.graph_page_rank_metric(user, query_results)
 
     def is_new_user(self,userID): #TODO
         #Must return true if the userId is new, false if it is known
@@ -52,25 +55,6 @@ class Reranker(object):
             raise NotImplementedError("Unknown dataset")
         return f"q-{maxId+1}"
 
-    def generate_user_document_graph(self):
-        res = Graph()
-        if self.dataset=="AOL":
-            doc='datasets/AOL4PS/data.csv'
-            if self.validation:
-                doc='datasets/AOL4PS/training_data.csv'
-            with open(doc) as f:
-                reader = csv.reader(f, delimiter='\t')
-                firstRow = True
-                pbar = tqdm(reader, desc='Parsing queries', unit='rows')
-                for row in pbar:
-                    if firstRow:
-                        firstRow = False
-                        continue
-                    res.add_link(row[0], row[5])
-        else:
-            raise NotImplementedError("Unknown dataset")
-        return res
-        
 
     def PClick(self, queryID, query_results, userID):
         """Hello world metric, defined in https://dl.acm.org/doi/10.1145/1242572.1242651"""
@@ -102,9 +86,20 @@ class Reranker(object):
         ranking_ratio = 0.7
         res=[]
         for document, score in documents:
-            metric = self.user_document.common_neighbors(user, document)
-            # metric = self.user_document.adamic_adar(user, document)
-            # metric = self.user_document.rooted_page_rank(user, document)
+            # metric = 1 / self.user_document.shortest_distance(user, document)
+            # metric = 1 / self.user_document.weighted_shortest_distance(user, document)
+            # metric = self.user_document.common_neighbors(user, document)
+            metric = self.user_document.adamic_adar(user, document)
             new_score = score * (1 - ranking_ratio) + metric * ranking_ratio
+            res.append((document, new_score))
+        return res
+
+    def graph_page_rank_metric(self, user, documents):
+        ranking_ratio = 1
+        res=[]
+        pagerank_scores = self.user_document.rooted_page_rank(user, documents)
+        for d, pagerank_score in zip(documents, pagerank_scores):
+            document, score = d
+            new_score = score * (1 - ranking_ratio) + pagerank_score * ranking_ratio
             res.append((document, new_score))
         return res
