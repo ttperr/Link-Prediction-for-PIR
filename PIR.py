@@ -6,6 +6,7 @@ from indexer import index_in_elasticsearch
 import Reranker
 import connector
 import csv
+import math
 from tqdm import tqdm
 from UI import Ui_Widget
 from PySide6.QtWidgets import QApplication, QWidget
@@ -56,9 +57,11 @@ class PIR(object):
             return out_results
         return None
 
-    def query_es(self, search_text):
+    def query_es(self, search_text,n=None):
+        if n == None:
+            n = self.n_docs
         if self.dataset == "AOL":
-            return self.client.search(index=self.index, query={"match": {"title": {"query": search_text, "fuzziness": "AUTO"}}}, size=self.n_docs)
+            return self.client.search(index=self.index, query={"match": {"title": {"query": search_text, "fuzziness": "AUTO"}}}, size=n)
         return None
 
     def clean_query(self, query_result):
@@ -77,8 +80,14 @@ class PIR(object):
         # TODO pass needed values to self.reranker to update the logs
     
     def evaluate(self):
+        test_sample=50 #TODO remove
         count=0
         relevant_retrieved_by_ES=0
+        #Using as key: -ES: original results by ES; -rr_ES: reranked considering ES; -rr_noES: reranked not considering ES weights; -log: log data
+        RR={"rr_ES":0.,"rr_noES":0.0,"ES":0.0}
+        tau={"rr_ES":{"ES":0.},"rr_noES":{"ES":0.,"log":0}}
+        rDG={"rr_ES":{"log":0,"ES":0},"rr_noES":{"log":0.,"ES":0.}}
+        topKrecall={"rr_ES":self.top_k_recall(),"rr_noES":self.top_k_recall(),"ES":self.top_k_recall()}
         if self.dataset=="AOL":
             with open('datasets/AOL4PS/validation_data.csv') as f, open('datasets/AOL4PS/query.csv','r') as q:
                 queries=q.readlines()
@@ -93,16 +102,50 @@ class PIR(object):
                     rank_in_log=int(row[7])+1
                     relevant_doc=row[5]
                     query_text=(queries[int(row[1][2:])+1]).split("\t")[0]
-                    ES_rankings=self.clean_query(self.query_es(query_text))
+                    ES_rankings=self.clean_query(self.query_es(query_text,100))
+                    
+                    count+=1
+                    #TODO: -rDG(rr(log docs only)+log)
+                    #TODO: -tau(rr(log docs only)+log)
                     if(len(ES_rankings)>0):
-                        ES_with_ties,rank_in_ES=self.aggregate_ties_finding_relevant(ES_rankings,relevant_doc)
-                        #print(relevant_doc)
-                        #print(ES_rankings)
-                        #print(self.aggregate_ties_finding_relevant(ES_rankings,relevant_doc))
+                        #done: -topKrecall (ES,rr_noES,rr_ES)
+                        #TODO: -MRR (ES, rr_noES,rr_ES)
+                        #TODO: -tau(ES+rr_ES,ES+rr_noES)
+                        #TODO: -rDG(ES+rr_ES,ES+rr_noES)
+                        #TODO: -rDG(rr_ES+logs(EXTRA FILTERED))
+                        ES_with_ties,ES_rank=self.aggregate_ties_finding_relevant(ES_rankings,relevant_doc)
+                        if(ES_rank<0):
+                            continue
                         relevant_retrieved_by_ES+=1
-                        count+=1
+                        rr_ES_rankings=(self.reranker.rerank(query_text,ES_rankings,row[0]))
+                        rr_ES_rankings.sort(key=lambda a: a[1], reverse=True)
+                        rr_noES_rankings=(self.reranker.rerank(query_text,[(t[0],1.) for t in ES_rankings],row[0]))
+                        rr_noES_rankings.sort(key=lambda a: a[1], reverse=True)
+                        rr_ES_with_ties,rr_ES_rank=self.aggregate_ties_finding_relevant(rr_ES_rankings,relevant_doc)
+                        rr_noES_with_ties,rr_noES_rank=self.aggregate_ties_finding_relevant(rr_noES_rankings,relevant_doc)
+                        #recalls
+                        self.top_k_recall(topKrecall["ES"],ES_rank)
+                        self.top_k_recall(topKrecall["rr_ES"],rr_ES_rank)
+                        self.top_k_recall(topKrecall["rr_noES"],rr_noES_rank)
+                        #RR
+                        RR["ES"]+=1/ES_rank
+                        RR["rr_ES"]+=1/rr_ES_rank
+                        RR["rr_noES"]+=1/rr_noES_rank
+                        #rDG
+                        rDG["rr_ES"]["ES"]+=self.rDG(rr_ES_rank,ES_rank)
+                        rDG["rr_noES"]["ES"]+=self.rDG(rr_ES_rank,ES_rank)
+                        #TODO rDG["rr_ES"]["log"]
+                        #tau
+                        tau["rr_ES"]["ES"]+=self.kendall_tau(rr_ES_with_ties,ES_with_ties)
+                        tau["rr_noES"]["ES"]+=self.kendall_tau(rr_noES_with_ties,ES_with_ties)
+                    if(count>=test_sample):
+                        break
+                        
             print(count,"validation samples.")
-            print(relevant_retrieved_by_ES,"times ES managed to retrieve the relevant doc.")
+            print("Over the ",relevant_retrieved_by_ES,"(","{:.2f}".format(relevant_retrieved_by_ES/count),") times ES managed to retrieve the relevant doc, we have:")
+            self.top_k_recall(print_t=True)
+            print(topKrecall)
+            print(rDG)
         else:
             raise NotImplementedError("Unknown dataset")
         pass
@@ -126,6 +169,25 @@ class PIR(object):
                 tmp=[clean_query_result[t][0]]
         result.append(tmp)
         return result,rank
+    def kendall_tau(self,r1_with_ties,r2_with_ties):
+        #TODO
+        return 0.
+    def rDG(self,r1,r2):
+        if r1==r2:
+            return 0.
+        return (r2-r1)/(abs(r1-r2))*math.log(1+abs(r1-r2))/math.log(1+min(r1,r2))
+    def top_k_recall(self,cumulative=None,r=None,print_t=False):
+        thresholds=[1,3,5,10,25,100]
+        if(print_t):
+            print(thresholds)
+            return
+        if cumulative is None:
+            return [0 for i in thresholds]
+        else:
+            for i,t in enumerate(thresholds):
+                if r<=t:
+                    cumulative[i]+=1
+        
 
 class Widget(QWidget):
     def __init__(self, PIR, n, parent=None):
