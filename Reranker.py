@@ -24,8 +24,8 @@ class Reranker(object):
             return []
         queryID = self.getQueryID(query_text)
         # return self.PClick(queryID, query_results, user)
-        return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.shortest_distance)
-        return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.weighted_shortest_distance)
+        return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.shortest_distance(u,d))
+        return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.weighted_shortest_distance(u,d))
         return self.graph_metric(user, query_results, self.user_document.common_neighbors)
         return self.graph_metric(user, query_results, self.user_document.adamic_adar)
         return self.user_document_page_rank(user, query_results)
@@ -96,8 +96,8 @@ class Reranker(object):
     def combine_score(self, doc_and_score, metric):
         document, score = doc_and_score
         if callable(metric):
-            return score * (1 - self.ranking_ratio) + metric(document) * self.ranking_ratio
-        return score * (1 - self.ranking_ratio) + metric * self.ranking_ratio
+            return (document, score * (1 - self.ranking_ratio) + metric(document) * self.ranking_ratio)
+        return (document, score * (1 - self.ranking_ratio) + metric * self.ranking_ratio)
     
     def prop_flow_ranking(self, user, documents):
         ranking_ratio = 0.5  
