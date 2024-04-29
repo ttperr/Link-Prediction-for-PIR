@@ -19,16 +19,48 @@ class Reranker(object):
         else:
             raise NotImplementedError("Unknown dataset")
 
-    def rerank(self,query_text,query_results,user):
-        if len(query_results) == 0:
-            return []
+    def rerank(self,query_text,user,retrieved_docs,retrieved_scores,session=None):
+        '''
+        Computes the reranking scores based on various arguments. 
+
+        Args:
+            query_text: a string containing the searched text.
+            user: a string containing the user id. Can be new.
+            retrieved_docs: a np.array of strings, representing the doc ids.
+            retrieved_scores: a np.array of floats, containing the scores given by ElasticSearch. Index is the same as the docs. May be unsorted.
+            session: a string containing the session id. Must support None, i.e. when the sesion is not provided.
+        Returns:
+            reranked_scores: a np.array of the same shape and type as retrieved_scores, with updated values.
+        '''
+        if len(retrieved_docs) == 0:
+            return None
         queryID = self.getQueryID(query_text)
+        return np.random.shuffle(retrieved_scores) #TODO remove this line
         # return self.PClick(queryID, query_results, user)
         return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.shortest_distance(u,d))
         return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.weighted_shortest_distance(u,d))
         return self.graph_metric(user, query_results, self.user_document.common_neighbors)
         return self.graph_metric(user, query_results, self.user_document.adamic_adar)
         return self.user_document_page_rank(user, query_results)
+    def evaluation_metrics_scores(self,query_text,user,retrieved_docs,retrieved_scores,session=None):
+        '''
+        Computes reranking scores based on all metrics chosen for evaluation.
+
+        Args:
+            query_text: a string containing the searched text.
+            user: a string containing the user id. Can be new.
+            retrieved_docs: a np.array of strings, representing the doc ids.
+            retrieved_scores: a np.array of floats, containing the scores given by ElasticSearch. Index is the same as the docs. May be unsorted.
+            session: a string containing the session id. Must support None, i.e. when the sesion is not provided.
+        Returns:
+            reranked_scores: a np.array of the shape n_docs x metrics, containing the score for each doc.
+            metrics: a np.array containing the unique name of the metrics. Must have the same order as the rows of reranked_scores. 
+        '''
+        if len(retrieved_docs) == 0:
+            return None
+        queryID = self.getQueryID(query_text)
+        #TODO
+        return  np.concatenate((retrieved_scores.reshape(-1,1),retrieved_scores.reshape(-1,1)),axis=1), np.array(["same_as_input","same_as_input"])
 
     def is_new_user(self,userID): #TODO
         #Must return true if the userId is new, false if it is known

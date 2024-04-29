@@ -8,6 +8,7 @@ import connector
 import csv
 import math
 from tqdm import tqdm
+import numpy as np
 from UI import Ui_Widget
 from PySide6.QtWidgets import QApplication, QWidget
 import datasets.AOL4PS.splitter as AOL_splitter
@@ -35,20 +36,22 @@ class PIR(object):
     def query(self, search_text, user):
         results = self.query_es(search_text)
         # print(results)
-        clean_results = self.clean_query(results)
+        docs,scores = self.clean_query(results)
         print("ElasticSearch results (ordered)")
-        print(clean_results)
-        reranked_results = self.reranker.rerank(
-            search_text, clean_results, user)
-        print("Reranked results (ordered)")
-        reranked_results.sort(key=lambda a: a[1], reverse=True)
-        print(reranked_results)
+        print(docs,scores)
+        if docs is None:
+            return []
+        reranked_scores = self.reranker.rerank(
+            search_text, user,docs,scores)
+        print("Reranked results (index corrresponds to previous docs)")
+        print(reranked_scores)
+        reranked_docs=docs[np.argsort(-reranked_scores)]
         out_results = []
         if self.dataset == "AOL":
             # FASTER ways to do it, but since we have few results this is fine.
-            for new_pos in range(len(reranked_results)):
-                for old_pos in range(len(reranked_results)):
-                    if (reranked_results[new_pos][0] == clean_results[old_pos][0]):
+            for new_pos in range(len(docs)):
+                for old_pos in range(len(docs)):
+                    if (reranked_docs[new_pos] == docs[old_pos]):
                         doc = results["hits"]["hits"][old_pos]
                         out_results.append(
                             (old_pos-new_pos, doc["_id"], doc["_source"]["url"], doc["_source"]["title"]))
@@ -58,14 +61,26 @@ class PIR(object):
         return None
 
     def query_es(self, search_text,n=None):
-        if n == None:
+        if n is None:
             n = self.n_docs
         if self.dataset == "AOL":
             return self.client.search(index=self.index, query={"match": {"title": {"query": search_text, "fuzziness": "AUTO"}}}, size=n)
         return None
 
     def clean_query(self, query_result):
-        return ([(a["_id"], a["_score"]) for a in query_result["hits"]["hits"]])
+        """
+        Cleans the query results returned by elastic search.
+
+        Args:
+            query_result: the result of the query from elastic search 
+
+        Returns:
+            None,None: if no documents are returned by ElasticSearch
+            docs,scores: where doc is a np.array of strings and scores is a np.array of scores, with matching indexes.
+        """
+        if len(query_result["hits"]["hits"])==0:
+            return None,None
+        return np.array([a["_id"] for a in query_result["hits"]["hits"]]), np.array([a["_score"] for a in query_result["hits"]["hits"]]) 
 
     def register_click(self, doc_ids, user_id, doc_clicked_index, query_text):
         # doc_ids is a sorted list of [docid1, docid2], ordered from best to worst matching
@@ -101,43 +116,20 @@ class PIR(object):
                     log_rankings=row[6].split()
                     rank_in_log=int(row[7])+1
                     relevant_doc=row[5]
+                    session=row[3]
                     query_text=(queries[int(row[1][2:])+1]).split("\t")[0]
-                    ES_rankings=self.clean_query(self.query_es(query_text,100))
-                    
+                    user=row[0]
                     count+=1
-                    #TODO: -rDG(rr(log docs only)+log)
-                    #TODO: -tau(rr(log docs only)+log)
-                    if(len(ES_rankings)>0):
-                        #done: -topKrecall (ES,rr_noES,rr_ES)
-                        #TODO: -MRR (ES, rr_noES,rr_ES)
-                        #TODO: -tau(ES+rr_ES,ES+rr_noES)
-                        #TODO: -rDG(ES+rr_ES,ES+rr_noES)
-                        #TODO: -rDG(rr_ES+logs(EXTRA FILTERED))
-                        ES_with_ties,ES_rank=self.aggregate_ties_finding_relevant(ES_rankings,relevant_doc)
-                        if(ES_rank<0):
+                    #TODO: metrics considering the log only, and comparing rerank weight only (no ES) with logs
+                    self.reranker.evaluation_metrics_scores(query_text,user,np.array(log_rankings),np.ones(len(log_rankings)),session)
+                    
+                    ES_docs,ES_scores=self.clean_query(self.query_es(query_text,100))
+                    if(ES_scores is not None):
+                        
+                        if(relevant_doc not in ES_docs): #if the relevant doc is not retrieved
                             continue
                         relevant_retrieved_by_ES+=1
-                        rr_ES_rankings=(self.reranker.rerank(query_text,ES_rankings,row[0]))
-                        rr_ES_rankings.sort(key=lambda a: a[1], reverse=True)
-                        rr_noES_rankings=(self.reranker.rerank(query_text,[(t[0],1.) for t in ES_rankings],row[0]))
-                        rr_noES_rankings.sort(key=lambda a: a[1], reverse=True)
-                        rr_ES_with_ties,rr_ES_rank=self.aggregate_ties_finding_relevant(rr_ES_rankings,relevant_doc)
-                        rr_noES_with_ties,rr_noES_rank=self.aggregate_ties_finding_relevant(rr_noES_rankings,relevant_doc)
-                        #recalls
-                        self.top_k_recall(topKrecall["ES"],ES_rank)
-                        self.top_k_recall(topKrecall["rr_ES"],rr_ES_rank)
-                        self.top_k_recall(topKrecall["rr_noES"],rr_noES_rank)
-                        #RR
-                        RR["ES"]+=1/ES_rank
-                        RR["rr_ES"]+=1/rr_ES_rank
-                        RR["rr_noES"]+=1/rr_noES_rank
-                        #rDG
-                        rDG["rr_ES"]["ES"]+=self.rDG(rr_ES_rank,ES_rank)
-                        rDG["rr_noES"]["ES"]+=self.rDG(rr_ES_rank,ES_rank)
-                        #TODO rDG["rr_ES"]["log"]
-                        #tau
-                        tau["rr_ES"]["ES"]+=self.kendall_tau(rr_ES_with_ties,ES_with_ties)
-                        tau["rr_noES"]["ES"]+=self.kendall_tau(rr_noES_with_ties,ES_with_ties)
+                        #TODO: metrics considering the ES score and comparing reranking with initial ES
                     if(count>=test_sample):
                         break
                         
@@ -150,25 +142,34 @@ class PIR(object):
             raise NotImplementedError("Unknown dataset")
         pass
 
-    def aggregate_ties_finding_relevant(self,clean_query_result,relevant_doc_id):
-        result=[]
-        tmp=[clean_query_result[0][0]]
-        prev_score=clean_query_result[0][1]
-        rank=-1
-        if(clean_query_result[0][0]==relevant_doc_id):
-            rank=1
+    def compute_ranks_with_ties(self,scores):
+        '''
+        Gives ranking based on scores
+
+        Args:
+            scores: a np.array of floats, containing the scores. The indexes are the same as doc ids. May be unsorted. 
+                    Can be a matrix where each row is a metric, and each column a document.
+
+        Returns:
+            ranks: a np.array containing the rank for each score. Has the same dimensions as scores.
+        '''
         
-        for t in range(1,len(clean_query_result)):
-            if(clean_query_result[t][0]==relevant_doc_id):
-                rank=len(result)+1
-            if(clean_query_result[t][1]==prev_score):
-                tmp.append(clean_query_result[t][0])
-            else:
-                prev_score=clean_query_result[t][1]
-                result.append(tmp.copy())
-                tmp=[clean_query_result[t][0]]
-        result.append(tmp)
-        return result,rank
+        if(scores.n_dim<2):
+            scores.reshape(-1,1)
+        ranks=np.zeros(scores.shape,dtype=np.int32)
+        arg_ranks=np.argsort(scores,axis=1)
+        for i in range(arg_ranks):
+            score=-1
+            r=1
+            t=1
+            for j in arg_ranks[i,:]:
+                if scores[i,j]!=score:
+                    t=r
+                ranks[i,j]=t
+                r+=1
+        return ranks
+
+        
     def kendall_tau(self,r1_with_ties,r2_with_ties):
         #TODO
         return 0.
