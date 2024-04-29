@@ -121,8 +121,8 @@ class PIR(object):
                     user=row[0]
                     count+=1
                     #TODO: metrics considering the log only, and comparing rerank weight only (no ES) with logs
-                    self.reranker.evaluation_metrics_scores(query_text,user,np.array(log_rankings),np.ones(len(log_rankings)),session)
-                    
+                    scores,metrics=self.reranker.evaluation_metrics_scores(query_text,user,np.array(log_rankings),np.ones(len(log_rankings)),session)
+                    rankings=self.compute_ranks_with_ties(scores)
                     ES_docs,ES_scores=self.clean_query(self.query_es(query_text,100))
                     if(ES_scores is not None):
                         
@@ -130,6 +130,8 @@ class PIR(object):
                             continue
                         relevant_retrieved_by_ES+=1
                         #TODO: metrics considering the ES score and comparing reranking with initial ES
+                        scores,_=self.reranker.evaluation_metrics_scores(query_text,user,ES_docs,ES_scores,session)
+                        rankings=self.compute_ranks_with_ties(scores)
                     if(count>=test_sample):
                         break
                         
@@ -154,11 +156,11 @@ class PIR(object):
             ranks: a np.array containing the rank for each score. Has the same dimensions as scores.
         '''
         
-        if(scores.n_dim<2):
+        if(scores.ndim<2):
             scores.reshape(-1,1)
         ranks=np.zeros(scores.shape,dtype=np.int32)
         arg_ranks=np.argsort(scores,axis=1)
-        for i in range(arg_ranks):
+        for i in range(scores.shape[1]):
             score=-1
             r=1
             t=1
