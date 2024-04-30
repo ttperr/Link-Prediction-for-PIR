@@ -35,6 +35,18 @@ class Reranker(object):
         if len(retrieved_docs) == 0:
             return None
         queryID = self.getQueryID(query_text)
+        self.compute_metrics(user, retrieved_docs)
+        return self.mix_scores(
+            (retrieved_scores, 1),
+            (self.UD_shortest_distance, 1),
+            (self.UD_weighted_shortest_distance, 1),
+            (self.UD_common_neighbors, 1),
+            (self.UD_adamic_adar, 1),
+            (self.UD_page_rank, 1),
+            (self.UD_prop_flow, 1)
+        )
+
+    def compute_metrics(self, user, retrieved_docs):
         time_start = time.time()
         print("Computing user-document metrics\nshortest distance...", end="")
         self.UD_shortest_distance = np.reciprocal(self.user_document.shortest_distance(user, retrieved_docs))
@@ -49,15 +61,6 @@ class Reranker(object):
         print("done\nprop flow...", end="")
         self.UD_prop_flow = self.user_document.prop_flow(user, retrieved_docs)
         print(f"done\nComputations took {time.time()-time_start}s")
-        return self.mix_scores(
-            (retrieved_scores, 1),
-            (self.UD_shortest_distance, 1),
-            (self.UD_weighted_shortest_distance, 1),
-            (self.UD_common_neighbors, 1),
-            (self.UD_adamic_adar, 1),
-            (self.UD_page_rank, 1),
-            (self.UD_prop_flow, 1)
-        )
 
     def evaluation_metrics_scores(self,query_text,user,retrieved_docs,retrieved_scores,session=None):
         '''
@@ -76,8 +79,25 @@ class Reranker(object):
         if len(retrieved_docs) == 0:
             return None
         queryID = self.getQueryID(query_text)
-        #TODO
-        return  np.concatenate((retrieved_scores.reshape(-1,1),retrieved_scores.reshape(-1,1)),axis=1), np.array(["same_as_input","same_as_input"])
+        self.compute_metrics(user, retrieved_docs)
+        return (
+            np.matrix([
+                self.UD_shortest_distance,
+                self.UD_weighted_shortest_distance,
+                self.UD_common_neighbors,
+                self.UD_adamic_adar,
+                self.UD_page_rank,
+                self.UD_prop_flow
+            ]),
+            np.array([
+                "user_document-shortest_distance",
+                "user_document-weighted_shortest_distance",
+                "user_document-common_neighbors",
+                "user_document-adamic_adar",
+                "user_document-page_rank",
+                "user_document-prop_flow",
+            ])
+        )
 
     def is_new_user(self,userID): #TODO
         #Must return true if the userId is new, false if it is known
@@ -153,7 +173,7 @@ class Reranker(object):
         tmp = self.ranking_ratio
         self.ranking_ratio = 1
         k = len(documents)
-        res = np.matrix(
+        res = np.matrix([
             # nodes degrees
             [self.user_document.degree(user)] * k,
             [self.user_document.degree(document) for document in documents],
@@ -201,7 +221,7 @@ class Reranker(object):
             self.QD_prop_flow,
             [self.QU_prop_flow] * k,
             [self.QS_prop_flow] * k,
-        )
+        ])
         self.ranking_ratio = tmp
         return res
     

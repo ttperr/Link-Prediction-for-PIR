@@ -55,12 +55,12 @@ class Graph(object):
 
     def shortest_distance(self, start, targets):
         lengths = nx.shortest_path_length(self.nx_graph, start, weight=lambda u,v,e: 1/e.get('weight', 0))
-        return [lengths.get(arrival, 0) + EPSILON for arrival in targets]
+        return np.array([lengths.get(arrival, 0) + EPSILON for arrival in targets])
 
     def weighted_shortest_distance(self, start, targets):
         """Each edge is weighted by the degree of arrival node. Going to a more popular node is less significant"""
         lengths = nx.shortest_path_length(self.nx_graph, start, weight=lambda u,v,e: self.nx_graph.degree(v)/e.get('weight', 0))
-        return [lengths.get(arrival, 0) + EPSILON for arrival in targets]
+        return np.array([lengths.get(arrival, 0) + EPSILON for arrival in targets])
 
     def common_neighbors_metric(self, node1, targets):
         return np.array([self.common_neighbors_single(node1, node2) for node2 in targets])
@@ -97,13 +97,13 @@ class Graph(object):
         for node in neighbors_node1:
             tmp = 0
             for z in nx.common_neighbors(self.nx_graph, node, node2):
-                tmp += 1/math.log(self.degree(z))
+                tmp += 1/math.log(self.degree(z)+EPSILON)
             res += tmp * self.get_weight(node1, node) / self.degree(node)
         neighbors_node2 = self.neighbors(node2)
         for node in neighbors_node2:
             tmp = 0
             for z in nx.common_neighbors(self.nx_graph, node, node1):
-                tmp += 1/math.log(self.degree(z))
+                tmp += 1/math.log(self.degree(z)+EPSILON)
             res += tmp * self.get_weight(node2, node) / self.degree(node)
         return res
     
