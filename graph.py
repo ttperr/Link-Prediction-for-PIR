@@ -9,6 +9,8 @@ import networkx as nx
 import numpy as np
 from tqdm import tqdm
 
+EPSILON = 0.001
+
 class Graph(object):
     
     def __init__(self, index1, index2, validation, dataset="AOL", name=None) -> None:
@@ -18,7 +20,6 @@ class Graph(object):
         self.populate_graph_from_logs(index1, index2, validation, dataset)
 
     def add_link(self, node1, node2):
-        # networkx graph
         if self.nx_graph.has_edge(node1, node2):
             self.nx_graph[node1][node2]['weight'] += 1
         else:
@@ -52,22 +53,19 @@ class Graph(object):
     def degree(self, node):
         return self.nx_graph.degree[node]
 
-    def shortest_distance(self, start, arrival):
-        try:
-            return nx.shortest_path_length(self.nx_graph, start, arrival)
-            # return nx.shortest_path_length(self.nx_graph, start, arrival, lambda u,v,e: 1/e['weight'])
-        except (nx.NetworkXNoPath, nx.NodeNotFound):
-            return math.inf
+    def shortest_distance(self, start, targets):
+        lengths = nx.shortest_path_length(self.nx_graph, start, weight=lambda u,v,e: 1/e.get('weight', 0))
+        return [lengths.get(arrival, 0) + EPSILON for arrival in targets]
 
-    def weighted_shortest_distance(self, start, arrival):
+    def weighted_shortest_distance(self, start, targets):
         """Each edge is weighted by the degree of arrival node. Going to a more popular node is less significant"""
-        try:
-            return nx.shortest_path_length(self.nx_graph, start, arrival, lambda u,v,e: self.nx_graph.degree(v))
-            # return nx.shortest_path_length(self.nx_graph, start, arrival, lambda u,v,e: self.nx_graph.degree(v)/e['weight'])
-        except (nx.NetworkXNoPath, nx.NodeNotFound):
-            return math.inf
+        lengths = nx.shortest_path_length(self.nx_graph, start, weight=lambda u,v,e: self.nx_graph.degree(v)/e.get('weight', 0))
+        return [lengths.get(arrival, 0) + EPSILON for arrival in targets]
 
-    def common_neighbors(self, node1, node2):
+    def common_neighbors_metric(self, node1, targets):
+        return np.array([self.common_neighbors_single(node1, node2) for node2 in targets])
+
+    def common_neighbors_single(self, node1, node2):
         """
         Basic link prediction metric calculated on the user-document graph
         inspired by paper: https://onlinelibrary.wiley.com/doi/10.1002/asi.20591
@@ -85,7 +83,10 @@ class Graph(object):
             res += len(intersection) * self.get_weight(node2, node) / self.degree(node)
         return res
 
-    def adamic_adar(self, node1, node2):
+    def adamic_adar_metric(self, node1, targets):
+        return np.array([self.adamic_adar_single(node1, node2) for node2 in targets])
+
+    def adamic_adar_single(self, node1, node2):
         """
         Adamic-Adar similarity metrics defined in https://www.sciencedirect.com/science/article/pii/S0378873303000091?via%3Dihub
         """
@@ -108,9 +109,31 @@ class Graph(object):
     
     def rooted_page_rank(self, root_node, target_nodes):
         pagerank_scores = nx.pagerank(self.nx_graph, weight='weight', personalization={root_node: 1})
-        return [pagerank_scores[node] if self.nx_graph.has_node(node) else 0 for node, _ in target_nodes]
+        return np.array([pagerank_scores.get(node, 0) + EPSILON for node in target_nodes])
+
+    def prop_flow(self, source_node, targets, max_length:int=5):
+        visit_probability = {source_node: 1.0}  
+        for step in range(max_length):
+            next_visit_probability = {}
+            for current_node, prob in visit_probability.items():
+                neighbors = self.neighbors(current_node)
+                if not neighbors:
+                    continue
+                transfer_prob = prob / len(neighbors)
+                for neighbor in neighbors:
+                    if neighbor not in next_visit_probability:
+                        next_visit_probability[neighbor] = 0
+                    next_visit_probability[neighbor] += transfer_prob
+
+            visit_probability = next_visit_probability
+        
+        return np.array([visit_probability.get(node, 0) for node in targets])
 
     def display_stats(self):
+        '''
+        Dipslay the stats of the graph.
+        Please leave this function at the end of the file.
+        '''
         G = self.nx_graph
         print(f"Graph {self.name}:")
         print(f"|N| = {len(G.nodes)}\t |E| = {len(G.edges)}")
@@ -148,27 +171,6 @@ class Graph(object):
 
         fig.tight_layout()
         plt.show()
-    
-    def prop_flow(self, source_node, target_node, max_length):
-        if source_node == target_node:
-            return 0  
-
-        visit_probability = {source_node: 1.0}  
-        for step in range(max_length):
-            next_visit_probability = {}
-            for current_node, prob in visit_probability.items():
-                neighbors = self.neighbors(current_node)
-                if not neighbors:
-                    continue
-                transfer_prob = prob / len(neighbors)
-                for neighbor in neighbors:
-                    if neighbor not in next_visit_probability:
-                        next_visit_probability[neighbor] = 0
-                    next_visit_probability[neighbor] += transfer_prob
-
-            visit_probability = next_visit_probability
-        
-        return visit_probability.get(target_node, 0)    
 
 if __name__=="__main__":
     user_pages = Graph(0, 5, False, name="user-pages")
