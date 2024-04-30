@@ -50,12 +50,12 @@ class Reranker(object):
         self.UD_prop_flow = self.user_document.prop_flow(user, retrieved_docs)
         print(f"done\nComputations took {time.time()-time_start}s")
         return self.mix_scores(
-            (retrieved_scores, 0),
-            (self.UD_shortest_distance, 0),
-            (self.UD_weighted_shortest_distance, 0),
-            (self.UD_common_neighbors, 0),
-            (self.UD_adamic_adar, 0),
-            (self.UD_page_rank, 0),
+            (retrieved_scores, 1),
+            (self.UD_shortest_distance, 1),
+            (self.UD_weighted_shortest_distance, 1),
+            (self.UD_common_neighbors, 1),
+            (self.UD_adamic_adar, 1),
+            (self.UD_page_rank, 1),
             (self.UD_prop_flow, 1)
         )
 
@@ -145,7 +145,8 @@ class Reranker(object):
         res = np.zeros(shape=shape)
         for score, weight in arg:
             assert score.shape == shape
-            res += weight * score
+            normalized_score = score / np.linalg.norm(score)
+            res += weight * normalized_score
         return res
     
     def graph_features(self, query, user, documents, session=None):
