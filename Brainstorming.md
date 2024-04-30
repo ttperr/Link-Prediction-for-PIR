@@ -18,16 +18,19 @@
 		- G-Click
 	- graph based
 	- contextual features
-
+  
 ----
 
 What we want to do:
-- new dataset -> 1/4												Lo
 - 2 validation -> 1 person											Lo/Ti
-- 1 more graph based metrics (rooted pagerank & propflow) -> 3/4	Ha/Ti
-- 3 ML classification of edges -> 1 person							Lo/Ha
-- 1 validation metrics -> 1/4										Lo
-- 2 retrieving more documents -> 1/4 								Tr
-- 2 correcting typos -> 1/2											Tr
+- 3 ML classification of edges -> 1 person							Tr/Ha
 - / report 															anyone
-- 2 adding searches to the logs -> 1/4								Ti
+- slides
+- 2 adding searches to the logs -> 1/4								first come
+- graph analysis
+- 2 normalize scores to balance them
+<!-- - new dataset -> 1/4												Lo -->
+<!-- - 1 more graph based metrics (rooted pagerank & propflow) -> 3/4	Ha/Ti -->
+<!-- - 1 validation metrics -> 1/4										Lo -->
+<!-- - 2 retrieving more documents -> 1/4 								Tr -->
+<!-- - 2 correcting typos -> 1/2											Tr -->
