@@ -24,11 +24,12 @@ class Reranker(object):
             return []
         queryID = self.getQueryID(query_text)
         # return self.PClick(queryID, query_results, user)
-        return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.shortest_distance(u,d))
-        return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.weighted_shortest_distance(u,d))
-        return self.graph_metric(user, query_results, self.user_document.common_neighbors)
-        return self.graph_metric(user, query_results, self.user_document.adamic_adar)
-        return self.user_document_page_rank(user, query_results)
+        # return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.shortest_distance(u,d))
+        # return self.graph_metric(user, query_results, lambda u,d: 1/self.user_document.weighted_shortest_distance(u,d))
+        # return self.graph_metric(user, query_results, self.user_document.common_neighbors)
+        # return self.graph_metric(user, query_results, self.user_document.adamic_adar)
+        # return self.user_document_page_rank(user, query_results)
+        return self.prop_flow_ranking(user, query_results)
 
     def is_new_user(self,userID): #TODO
         #Must return true if the userId is new, false if it is known
@@ -119,6 +120,7 @@ class Reranker(object):
             self.graph_metric(user, documents, self.user_document.common_neighbors),
             self.graph_metric(user, documents, self.user_document.adamic_adar),
             self.user_document_page_rank(user, documents),
+            self.prop_flow_ranking(user, documents),
             self.graph_metric(session, documents, lambda u,d: self.session_document.degree(u)),
             self.graph_metric(session, documents, lambda u,d: self.session_document.degree(d)),
             self.graph_metric(session, documents, lambda u,d: 1/self.session_document.shortest_distance(u, d)),

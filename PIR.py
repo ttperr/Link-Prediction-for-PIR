@@ -203,7 +203,7 @@ def main():
                         help="Load data to ElasticSearch")
     parser.add_argument("-d", type=str, default="AOL",
                         help="Specify the dataset type. All parameters associated to dataset are hardcoded")
-    parser.add_argument("-n", type=int, default=25,
+    parser.add_argument("-n", type=int, default=100,
                         help="Specify the maximum number of docs you want to return each search")
     parser.add_argument("-v", default=False, action="store_true",
                         help="Specify if you are performing validation")
