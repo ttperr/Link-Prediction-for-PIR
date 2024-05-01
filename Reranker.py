@@ -77,7 +77,7 @@ class Reranker(object):
             return None
         queryID = self.getQueryID(query_text)
         #TODO
-        return  np.concatenate((retrieved_scores.reshape(-1,1),retrieved_scores.reshape(-1,1)),axis=1), np.array(["same_as_input","same_as_input"])
+        return  np.random.rand(len(retrieved_docs),2), np.array(["random_scores_1","random_scores_2"])
 
     def is_new_user(self,userID): #TODO
         #Must return true if the userId is new, false if it is known

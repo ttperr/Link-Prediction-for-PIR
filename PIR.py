@@ -97,18 +97,24 @@ class PIR(object):
     def evaluate(self):
         test_sample=50 #TODO remove
         count=0
-        relevant_retrieved_by_ES=0
-        #Using as key: -ES: original results by ES; -rr_ES: reranked considering ES; -rr_noES: reranked not considering ES weights; -log: log data
-        RR={"rr_ES":0.,"rr_noES":0.0,"ES":0.0}
-        tau={"rr_ES":{"ES":0.},"rr_noES":{"ES":0.,"log":0}}
-        rDG={"rr_ES":{"log":0,"ES":0},"rr_noES":{"log":0.,"ES":0.}}
-        topKrecall={"rr_ES":self.top_k_recall(),"rr_noES":self.top_k_recall(),"ES":self.top_k_recall()}
+        relevant_retrieved_by_ES=0  
+        #Indexed as RR/topKrecall[A][B]:
+        #   -A determines on which set of documnet the metric is computed
+        #   -B determines on which ranking
+        RR={"log":{"log":0.0,"metrics":None},"ES":{"ES":0.0,"metrics":None}}
+        topKrecall={"log":{"log":None,"metrics":None},"ES":{"ES":None,"metrics":None}}
+        #tau/rDG[A], where A refers to the order it is compared with and the set of documents.
+        tau={"ES":None,"log":None}
+        rDG={"log":None,"ES":None}
+        topKthresholds={"log":np.array([1,3,5,10]),"ES":np.array([1,3,5,10,25,100,150])}
+        #TODO remove next line:
         if self.dataset=="AOL":
             with open('datasets/AOL4PS/validation_data.csv') as f, open('datasets/AOL4PS/query.csv','r') as q:
                 queries=q.readlines()
                 reader = csv.reader(f, delimiter='\t')
                 firstRow = True
                 pbar = tqdm(reader, desc='Validation', unit='rows')
+                metrics=[]
                 for row in pbar:
                     if firstRow:
                         firstRow = False
@@ -120,9 +126,18 @@ class PIR(object):
                     query_text=(queries[int(row[1][2:])+1]).split("\t")[0]
                     user=row[0]
                     count+=1
-                    #TODO: metrics considering the log only, and comparing rerank weight only (no ES) with logs
+                    #Metrics computed on logs resulst only
                     scores,metrics=self.reranker.evaluation_metrics_scores(query_text,user,np.array(log_rankings),np.ones(len(log_rankings)),session)
                     rankings=self.compute_ranks_with_ties(scores)
+                    RR["log"]["log"]=self.RR(rank_in_log,cumulative=RR["log"]["log"])
+                    RR["log"]["metrics"]=self.RR(rankings[rank_in_log-1,:],cumulative=RR["log"]["metrics"])
+                    topKrecall["log"]["log"]=self.top_k_recall(rank_in_log,cumulative=topKrecall["log"]["log"],thresholds=topKthresholds["log"])
+                    topKrecall["log"]["metrics"]=self.top_k_recall(rankings[rank_in_log-1,:],cumulative=topKrecall["log"]["metrics"],thresholds=topKthresholds["log"])
+                    tau["log"]=self.kendall_tau(np.arange(1,11),rankings,tau["log"])
+                    rDG["log"]=self.rDG(rank_in_log,rankings[rank_in_log-1,:],rDG["log"])
+                    #TODO taus and rDG
+                    #Metrics computed on ES results
+                    '''
                     ES_docs,ES_scores=self.clean_query(self.query_es(query_text,100))
                     if(ES_scores is not None):
                         
@@ -132,14 +147,25 @@ class PIR(object):
                         #TODO: metrics considering the ES score and comparing reranking with initial ES
                         scores,_=self.reranker.evaluation_metrics_scores(query_text,user,ES_docs,ES_scores,session)
                         rankings=self.compute_ranks_with_ties(scores)
+                    '''
                     if(count>=test_sample):
                         break
-                        
-            print(count,"validation samples.")
-            print("Over the ",relevant_retrieved_by_ES,"(","{:.2f}".format(relevant_retrieved_by_ES/count),") times ES managed to retrieve the relevant doc, we have:")
-            self.top_k_recall(print_t=True)
-            print(topKrecall)
-            print(rDG)
+            
+                print("\n\nMetrics computed on",count,"validation samples.")
+                print("Considering only the log documents, without any intervention of ES, we have:")
+                print("Top k recall (mean):")
+                print("\tk=\t",topKthresholds["log"])
+                print("\t log",topKrecall["log"]["log"]/count)
+                for i,met in enumerate(metrics):
+                    print(met,topKrecall["log"]["metrics"][i,:]/count)
+                print("\nMean reciprocal rank:")
+                print("\t log",RR["log"]["log"]/count)
+                for i,met in enumerate(metrics):
+                    print("\t",met,RR["log"]["metrics"][i]/count)
+                print("\nrDG (mean):")
+                for i,met in enumerate(metrics):
+                    print("\t",met,rDG["log"][i]/count)
+                #print("Over the ",relevant_retrieved_by_ES,"(","{:.2f}".format(relevant_retrieved_by_ES/count),") times ES managed to retrieve the relevant doc, we have:")
         else:
             raise NotImplementedError("Unknown dataset")
         pass
@@ -150,47 +176,109 @@ class PIR(object):
 
         Args:
             scores: a np.array of floats, containing the scores. The indexes are the same as doc ids. May be unsorted. 
-                    Can be a matrix where each row is a metric, and each column a document.
+                    Can be a matrix where each row is a document, and each column a metric.
 
         Returns:
             ranks: a np.array containing the rank for each score. Has the same dimensions as scores.
         '''
-        
         if(scores.ndim<2):
-            scores.reshape(-1,1)
+            scores=scores.reshape(-1,1)
         ranks=np.zeros(scores.shape,dtype=np.int32)
         arg_ranks=np.argsort(scores,axis=1)
         for i in range(scores.shape[1]):
             score=-1
             r=1
             t=1
-            for j in arg_ranks[i,:]:
-                if scores[i,j]!=score:
+            for j in range(scores.shape[0]):
+                if scores[j,i]!=score:
                     t=r
-                ranks[i,j]=t
+                    score=scores[j,i]
+                ranks[j,i]=t
                 r+=1
         return ranks
+    def find_doc_index(self,doc_list,rel_doc):
+        '''
+        Find the index of the relevant doc in a list of doc ids. If not present, return -1.
 
+        Args:
+            doc_list: a list of strings, containing the doc ids.
+            rel_doc: a string representing the id of the relevant doc
+
+        Returns:
+            ind: an int representing the index of rel_doc in doc_list. -1 if not present.
+        '''
+        try:
+            ind=doc_list.index(rel_doc)
+        except:
+            ind=-1
+        return ind
         
-    def kendall_tau(self,r1_with_ties,r2_with_ties):
-        #TODO
-        return 0.
-    def rDG(self,r1,r2):
-        if r1==r2:
-            return 0.
-        return (r2-r1)/(abs(r1-r2))*math.log(1+abs(r1-r2))/math.log(1+min(r1,r2))
-    def top_k_recall(self,cumulative=None,r=None,print_t=False):
-        thresholds=[1,3,5,10,25,100]
-        if(print_t):
-            print(thresholds)
-            return
+    def kendall_tau(self,ranking,rankings,cumulative=None):
+        ranking=ranking.reshape(-1,1)
+        if rankings.ndim<2:
+            rankings=rankings.reshape(-1,1)
+        '''
+        n_c=np.zeros(rankings.shape[1])
+        n_d=np.zeros(rankings.shape[1])
+        for d in range(ranking.shape[0]-1):
+            partial= (ranking[d+1:,:]-ranking[d,:]) * (rankings[d+1:,:]-rankings[d,:])
+            n_c+=(partial >0).sum(axis=0)
+            n_d+=(partial<0).sum(axis=0)
+        '''
+        partial=(np.expand_dims(ranking,0)-np.expand_dims(ranking,1))*(np.expand_dims(rankings,0)-np.expand_dims(rankings,1))
+        n_C=(partial>0).sum(axis=(0,1))
+        n_D=(partial<0).sum(axis=(0,1))
+        _,counts=np.unique(ranking,return_counts=True)
+        norm_factor=np.sqrt(rankings.shape[0]-(counts*(counts-1)).sum()/2)
+        norm_factors=np.zeros(rankings.shape[1])
+        for i in range(rankings.shape[1]):  
+            _,counts=np.unique(rankings[:,i],return_counts=True)
+            norm_factors[i]=np.sqrt(rankings.shape[0]-(counts*(counts-1)).sum()/2)
+        return (n_C-n_D)/(norm_factor*norm_factors)
+    def rDG(self,rank,ranks,cumulative=None):
+        '''
+        Gives ranking based on scores
+
+        Args:
+            rank: an int representing the rank we are comparing all the others with.
+            ranks: a np.array of ints, representing the rank of the relevant doc from various metrics, which are compared to rank.
+            cumulative: the cumulative current rDG
+
+        Returns:
+            rdg: a np.array of floats of the same dimension of ranks, containing the cumulative+rDG of ranks wrt rank.
+        '''
+        diff=ranks-rank
         if cumulative is None:
-            return [0 for i in thresholds]
+            return np.divide(-diff*np.log2(1+np.abs(diff)), np.abs(diff)*np.log2(1+np.minimum(ranks,rank)), out=np.zeros_like(ranks,dtype=np.float32), where=diff!=0)
+        return cumulative+np.divide(-diff*np.log2(1+np.abs(diff)), np.abs(diff)*np.log2(1+np.minimum(ranks,rank)), out=np.zeros_like(ranks,dtype=np.float32), where=diff!=0)
+
+    def top_k_recall(self,ranks,thresholds=np.array([1,3,5,10]),cumulative=None):
+        '''
+        Gives ranking based on scores
+
+        Args:
+            ranks: a np.array of ints, representing the rank of the relevant doc from various metrics, which are compared to rank.
+            cumulative: the cumulative current top_k_recalls
+
+        Returns:
+            top_k_recall: a bidimensional np.array of floats of the having ranks * threshold dimension, containing the cumulative+top_K_recall of ranks.
+        '''
+        if isinstance(ranks,np.ndarray):
+            thresholds=thresholds.reshape(1,-1)
+            ranks=ranks.reshape(-1,1)
+            out=np.zeros((ranks.shape[0],thresholds.shape[1]))
         else:
-            for i,t in enumerate(thresholds):
-                if r<=t:
-                    cumulative[i]+=1
-        
+            out=np.zeros(thresholds.shape[0])
+        out[thresholds>=ranks]=1
+        if cumulative is None:
+            return out
+        return cumulative+out
+    
+    def RR(self,ranks,cumulative=None):
+        if cumulative is None:
+            return 1/ranks
+        else:
+            return cumulative+1/ranks
 
 class Widget(QWidget):
     def __init__(self, PIR, n, parent=None):
