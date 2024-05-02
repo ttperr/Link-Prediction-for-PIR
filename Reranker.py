@@ -18,7 +18,7 @@ class Reranker(object):
             # self.query_user= Graph(1, 0, self.validation, dataset=self.dataset, name="query-user")
         else:
             raise NotImplementedError("Unknown dataset")
-    def updateGraphFromClicks(user_id,session,query_id,doc_id):
+    def updateGraphFromClicks(self,user_id,session,query_id,doc_id):
         '''
         Updates the graphs from user clicks.
         Args:
