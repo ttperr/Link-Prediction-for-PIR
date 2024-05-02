@@ -38,12 +38,12 @@ class Reranker(object):
         self.compute_metrics(user, retrieved_docs)
         return self.mix_scores(
             (retrieved_scores, 1),
-            (self.UD_shortest_distance, 1),
-            (self.UD_weighted_shortest_distance, 1),
+            # (self.UD_shortest_distance, 1),
+            # (self.UD_weighted_shortest_distance, 1),
             (self.UD_common_neighbors, 1),
             (self.UD_adamic_adar, 1),
-            (self.UD_page_rank, 1),
-            (self.UD_prop_flow, 1)
+            # (self.UD_page_rank, 1),
+            # (self.UD_prop_flow, 1)
         )
 
     def compute_metrics(self, user, retrieved_docs, progress=False):
