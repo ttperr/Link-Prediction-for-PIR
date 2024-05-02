@@ -18,13 +18,21 @@ class Reranker(object):
             # self.query_user= Graph(1, 0, self.validation, dataset=self.dataset, name="query-user")
         else:
             raise NotImplementedError("Unknown dataset")
-
-    def rerank(self,query_text,user,retrieved_docs,retrieved_scores,session=None):
+    def updateGraphFromClicks(user_id,session,query_id,doc_id):
+        '''
+        Updates the graphs from user clicks.
+        Args:
+            user_id: a string representing the user id. Possibly new.
+            session: a string representing the session. It is relative to the user id.
+            query_id: a string representing the query id. Possibly new.
+            doc_id: a string representing the clicked document. Possibly new (wrt the graph, not the collection).
+        '''
+    def rerank(self,query_id,user,retrieved_docs,retrieved_scores,session=None):
         '''
         Computes the reranking scores based on various arguments. 
 
         Args:
-            query_text: a string containing the searched text.
+            query_id: a string containing the query id.
             user: a string containing the user id. Can be new.
             retrieved_docs: a np.array of strings, representing the doc ids.
             retrieved_scores: a np.array of floats, containing the scores given by ElasticSearch. Index is the same as the docs. May be unsorted.
@@ -34,7 +42,6 @@ class Reranker(object):
         '''
         if len(retrieved_docs) == 0:
             return None
-        queryID = self.getQueryID(query_text)
         self.compute_metrics(user, retrieved_docs)
         return self.mix_scores(
             (retrieved_scores, 1),
@@ -69,12 +76,12 @@ class Reranker(object):
         if progress:
             print(f"done\nComputations took {time.time()-time_start}s")
 
-    def evaluation_metrics_scores(self,query_text,user,retrieved_docs,retrieved_scores,session=None):
+    def evaluation_metrics_scores(self,query_id,user,retrieved_docs,retrieved_scores,session=None):
         '''
         Computes reranking scores based on all metrics chosen for evaluation.
 
         Args:
-            query_text: a string containing the searched text.
+            query_id: a string containing the query id.
             user: a string containing the user id. Can be new.
             retrieved_docs: a np.array of strings, representing the doc ids.
             retrieved_scores: a np.array of floats, containing the scores given by ElasticSearch. Index is the same as the docs. May be unsorted.
@@ -85,7 +92,6 @@ class Reranker(object):
         '''
         if len(retrieved_docs) == 0:
             return None
-        queryID = self.getQueryID(query_text)
         self.compute_metrics(user, retrieved_docs)
         return (
             np.transpose(np.matrix([
@@ -109,27 +115,6 @@ class Reranker(object):
     def is_new_user(self,userID): #TODO
         #Must return true if the userId is new, false if it is known
         return not self.user_document.nx_graph.has_node(userID)
-    
-    def getQueryID(self, query_text):
-        """parse query.csv and return matching query id"""
-        maxId = 0
-        if self.dataset=="AOL":
-            with open('datasets/AOL4PS/query.csv') as f:
-                reader = csv.reader(f, delimiter='\t')
-                firstRow = True
-                pbar = tqdm(reader, desc='Parsing queries', unit='rows')
-                for row in pbar:
-                    if firstRow:
-                        firstRow = False
-                        continue
-                    if row[0] == query_text:
-                        return row[1]
-                    idNumber = int(row[1][2:])
-                    if idNumber > maxId:
-                        maxId = idNumber
-        else:
-            raise NotImplementedError("Unknown dataset")
-        return f"q-{maxId+1}"
 
 
     def PClick(self, queryID, retrieved_docs, retrieved_scores, userID):
@@ -172,7 +157,8 @@ class Reranker(object):
         res = np.zeros(shape=shape)
         for score, weight in arg:
             assert score.shape == shape
-            normalized_score = score / np.linalg.norm(score)
+            norm = np.linalg.norm(score)
+            normalized_score = score / norm if norm != 0 else np.zeros(shape=score.shape)
             res += weight * normalized_score
         return res
     

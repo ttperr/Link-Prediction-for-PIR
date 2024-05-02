@@ -5,6 +5,7 @@ import sys
 from indexer import index_in_elasticsearch
 import Reranker
 import connector
+import LogManager
 import csv
 import math
 from tqdm import tqdm
@@ -27,6 +28,7 @@ class PIR(object):
 
         # In future we can add flags initializing different rerankers (graph, contents,...)
         self.reranker = Reranker.Reranker(dataset, validation)
+        self.logManager= LogManager.LogManager(dataset)
         if validation:
             self.evaluate()
 
@@ -37,14 +39,15 @@ class PIR(object):
         results = self.query_es(search_text)
         # print(results)
         docs,scores = self.clean_query(results)
-        print("ElasticSearch results (ordered)")
-        print(docs,scores)
+        print("ElasticSearch results (ordered, top 10)")
+        print(docs[:min(10,scores.shape[0]-1)],scores[:min(10,scores.shape[0]-1)])
         if docs is None:
             return []
+        queryId,_=self.logManager.getQueryID(search_text)
         reranked_scores = self.reranker.rerank(
-            search_text, user,docs,scores)
+            queryId, user,docs,scores)
         print("Reranked results (index corrresponds to previous docs)")
-        print(reranked_scores)
+        print(reranked_scores[:min(10,scores.shape[0]-1)])
         reranked_docs=docs[np.argsort(-reranked_scores)]
         out_results = []
         if self.dataset == "AOL":
@@ -87,12 +90,10 @@ class PIR(object):
         # user_id is the user id
         # doc_clicked_index is the index of the document clicked. From 0 (the best matching) to len(doc_ids)-1 (worst matching)
         # query_text is the query text.
-        print("doc_ids", doc_ids)
-        print("user_id", user_id)
-        print("doc_clicked_index", doc_clicked_index)
-        print("query_text", query_text)
-
-        # TODO pass needed values to self.reranker to update the logs
+        print(self.logManager.getQueryText("q-5"))
+        queryId,session,isUserOk=self.logManager.register_log(doc_ids, user_id, doc_clicked_index, query_text)
+        if isUserOk:
+            self.reranker.updateGraphFromClicks(user_id,session,queryId,doc_ids[doc_clicked_index])
     
     def evaluate(self):
         test_sample=50 #TODO remove
@@ -108,8 +109,7 @@ class PIR(object):
         rDG={"log":None,"ES":None}
         topKthresholds={"log":np.array([1,3,5,10]),"ES":np.array([1,3,5,10,25,100,150])}
         if self.dataset=="AOL":
-            with open('datasets/AOL4PS/validation_data.csv') as f, open('datasets/AOL4PS/query.csv','r') as q:
-                queries=q.readlines()
+            with open('datasets/AOL4PS/validation_data.csv') as f:
                 reader = csv.reader(f, delimiter='\t')
                 firstRow = True
                 pbar = tqdm(reader, desc='Validation', unit='rows')
@@ -122,11 +122,12 @@ class PIR(object):
                     rank_in_log=int(row[7])+1
                     relevant_doc=row[5]
                     session=row[3]
-                    query_text=(queries[int(row[1][2:])+1]).split("\t")[0]
+                    queryId=row[1]
+                    queryText=self.logManager.getQueryText(queryId)
                     user=row[0]
                     count+=1
                     #Metrics computed on logs resulst only
-                    scores,metrics=self.reranker.evaluation_metrics_scores(query_text,user,np.array(log_rankings),np.ones(len(log_rankings)),session)
+                    scores,metrics=self.reranker.evaluation_metrics_scores(queryId,user,np.array(log_rankings),np.ones(len(log_rankings)),session)
                     rankings=self.compute_ranks_with_ties(scores)
                     RR["log"]["log"]=self.RR(rank_in_log,cumulative=RR["log"]["log"])
                     RR["log"]["metrics"]=self.RR(rankings[rank_in_log-1,:],cumulative=RR["log"]["metrics"])
@@ -136,7 +137,7 @@ class PIR(object):
                     rDG["log"]=self.rDG(rank_in_log,rankings[rank_in_log-1,:],rDG["log"])
                     #TODO taus and rDG
                     #Metrics computed on ES results
-                    ES_docs,ES_scores=self.clean_query(self.query_es(query_text,250))
+                    ES_docs,ES_scores=self.clean_query(self.query_es(queryText,250))
                     if(ES_scores is not None):
                         ES_ranking= self.compute_ranks_with_ties(ES_scores)
                         ind_ES=self.find_doc_index(ES_docs,relevant_doc)
@@ -144,7 +145,7 @@ class PIR(object):
                             rank_in_ES=ES_ranking[ind_ES]
                             relevant_retrieved_by_ES+=1
                             #TODO: metrics considering the ES score and comparing reranking with initial ES
-                            scores,_=self.reranker.evaluation_metrics_scores(query_text,user,ES_docs,ES_scores,session)
+                            scores,_=self.reranker.evaluation_metrics_scores(queryId,user,ES_docs,ES_scores,session)
                             rankings=self.compute_ranks_with_ties(scores)
                             RR["ES"]["ES"]=self.RR(rank_in_ES,cumulative=RR["ES"]["ES"])
                             RR["ES"]["metrics"]=self.RR(rankings[ind_ES,:],cumulative=RR["ES"]["metrics"])
