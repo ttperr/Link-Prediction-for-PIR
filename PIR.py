@@ -189,8 +189,8 @@ class PIR(object):
                     print("\nTau (mean):")
                     for i,met in enumerate(metrics):
                         print("\t",met,tau["ES"][i]/count)
-                    else:
-                        print("\n\nElasticSearch never retrieved the relevant document, so no statistics can be computed.")
+                else:
+                    print("\n\nElasticSearch never retrieved the relevant document, so no statistics can be computed.")
                 #print("Over the ",relevant_retrieved_by_ES,"(","{:.2f}".format(relevant_retrieved_by_ES/count),") times ES managed to retrieve the relevant doc, we have:")
         else:
             raise NotImplementedError("Unknown dataset")
