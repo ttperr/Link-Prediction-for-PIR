@@ -27,7 +27,12 @@ class Reranker(object):
             query_id: a string representing the query id. Possibly new.
             doc_id: a string representing the clicked document. Possibly new (wrt the graph, not the collection).
         '''
-        print("TODO:updateGraph")
+        self.user_document.add_link(user_id, doc_id)
+        # self.session_document.add_link(session, doc_id)
+        # self.query_document.add_link(query_id, doc_id)
+        # self.query_user.add_link(query_id, user_id)
+        # self.query_session.add_link(query_id, session)
+
     def rerank(self,query_id,user,retrieved_docs,retrieved_scores,session=None):
         '''
         Computes the reranking scores based on various arguments. 
