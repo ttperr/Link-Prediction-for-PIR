@@ -172,7 +172,8 @@ class Reranker(object):
         res = np.zeros(shape=shape)
         for score, weight in arg:
             assert score.shape == shape
-            normalized_score = score / np.linalg.norm(score)
+            norm = np.linalg.norm(score)
+            normalized_score = score / norm if norm != 0 else np.zeros(shape=score.shape)
             res += weight * normalized_score
         return res
     
