@@ -264,7 +264,13 @@ class PIR(object):
         for i in range(rankings.shape[1]):  
             _,counts=np.unique(rankings[:,i],return_counts=True)
             norm_factors[i]=np.sqrt(n_0-(counts*(counts-1)).sum()/2)
-        return (n_C-n_D)/(norm_factor*norm_factors)
+        with np.errstate(divide='ignore',invalid='ignore'):
+            result = (n_C-n_D)/(norm_factor*norm_factors)
+            result[norm_factor*norm_factors == 0] = 0
+        if cumulative is None:
+            return result
+        return cumulative+result
+    
     def rDG(self,rank,ranks,cumulative=None):
         '''
         Gives ranking based on scores
