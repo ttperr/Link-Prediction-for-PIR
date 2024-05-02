@@ -107,7 +107,6 @@ class PIR(object):
         tau={"ES":None,"log":None}
         rDG={"log":None,"ES":None}
         topKthresholds={"log":np.array([1,3,5,10]),"ES":np.array([1,3,5,10,25,100,150])}
-        #TODO remove next line:
         if self.dataset=="AOL":
             with open('datasets/AOL4PS/validation_data.csv') as f, open('datasets/AOL4PS/query.csv','r') as q:
                 queries=q.readlines()
@@ -137,17 +136,22 @@ class PIR(object):
                     rDG["log"]=self.rDG(rank_in_log,rankings[rank_in_log-1,:],rDG["log"])
                     #TODO taus and rDG
                     #Metrics computed on ES results
-                    '''
-                    ES_docs,ES_scores=self.clean_query(self.query_es(query_text,100))
+                    ES_docs,ES_scores=self.clean_query(self.query_es(query_text,250))
                     if(ES_scores is not None):
-                        
-                        if(relevant_doc not in ES_docs): #if the relevant doc is not retrieved
-                            continue
-                        relevant_retrieved_by_ES+=1
-                        #TODO: metrics considering the ES score and comparing reranking with initial ES
-                        scores,_=self.reranker.evaluation_metrics_scores(query_text,user,ES_docs,ES_scores,session)
-                        rankings=self.compute_ranks_with_ties(scores)
-                    '''
+                        ES_ranking= self.compute_ranks_with_ties(ES_scores)
+                        ind_ES=self.find_doc_index(ES_docs,relevant_doc)
+                        if(ind_ES>0): #if the relevant doc is retrieved
+                            rank_in_ES=ES_ranking[ind_ES]
+                            relevant_retrieved_by_ES+=1
+                            #TODO: metrics considering the ES score and comparing reranking with initial ES
+                            scores,_=self.reranker.evaluation_metrics_scores(query_text,user,ES_docs,ES_scores,session)
+                            rankings=self.compute_ranks_with_ties(scores)
+                            RR["ES"]["ES"]=self.RR(rank_in_ES,cumulative=RR["ES"]["ES"])
+                            RR["ES"]["metrics"]=self.RR(rankings[ind_ES,:],cumulative=RR["ES"]["metrics"])
+                            topKrecall["ES"]["ES"]=self.top_k_recall(rank_in_ES,cumulative=topKrecall["ES"]["ES"],thresholds=topKthresholds["ES"])
+                            topKrecall["ES"]["metrics"]=self.top_k_recall(rankings[ind_ES,:],cumulative=topKrecall["ES"]["metrics"],thresholds=topKthresholds["ES"])
+                            tau["ES"]=self.kendall_tau(ES_ranking,rankings,tau["ES"])
+                            rDG["ES"]=self.rDG(rank_in_ES,rankings[ind_ES,:],rDG["ES"])
                     if(count>=test_sample):
                         break
             
@@ -165,6 +169,26 @@ class PIR(object):
                 print("\nrDG (mean):")
                 for i,met in enumerate(metrics):
                     print("\t",met,rDG["log"][i]/count)
+                print("\nTau (mean):")
+                for i,met in enumerate(metrics):
+                    print("\t",met,tau["log"][i]/count)
+
+                print("\n\nMetrics computed on",relevant_retrieved_by_ES,"validation samples in which ElasticSearch returned the relevant document (",(relevant_retrieved_by_ES/count),"% ).")
+                print("Top k recall (mean):")
+                print("\tk=\t",topKthresholds["ES"])
+                print("\t ES",topKrecall["ES"]["ES"]/relevant_retrieved_by_ES)
+                for i,met in enumerate(metrics):
+                    print(met,topKrecall["ES"]["metrics"][i,:]/relevant_retrieved_by_ES)
+                print("\nMean reciprocal rank:")
+                print("\t ES",RR["ES"]["ES"]/relevant_retrieved_by_ES)
+                for i,met in enumerate(metrics):
+                    print("\t",met,RR["ES"]["metrics"][i]/relevant_retrieved_by_ES)
+                print("\nrDG (mean):")
+                for i,met in enumerate(metrics):
+                    print("\t",met,rDG["ES"][i]/relevant_retrieved_by_ES)
+                print("\nTau (mean):")
+                for i,met in enumerate(metrics):
+                    print("\t",met,tau["ES"][i]/count)
                 #print("Over the ",relevant_retrieved_by_ES,"(","{:.2f}".format(relevant_retrieved_by_ES/count),") times ES managed to retrieve the relevant doc, we have:")
         else:
             raise NotImplementedError("Unknown dataset")
@@ -184,12 +208,13 @@ class PIR(object):
         if(scores.ndim<2):
             scores=scores.reshape(-1,1)
         ranks=np.zeros(scores.shape,dtype=np.int32)
-        arg_ranks=np.argsort(scores,axis=1)
+        arg_ranks=np.argsort(-scores,axis=0)
         for i in range(scores.shape[1]):
             score=-1
             r=1
             t=1
-            for j in range(scores.shape[0]):
+            for k in range(scores.shape[0]):
+                j=arg_ranks[k,i]
                 if scores[j,i]!=score:
                     t=r
                     score=scores[j,i]
@@ -207,11 +232,11 @@ class PIR(object):
         Returns:
             ind: an int representing the index of rel_doc in doc_list. -1 if not present.
         '''
-        try:
-            ind=doc_list.index(rel_doc)
-        except:
-            ind=-1
-        return ind
+        
+        ind=np.nonzero(doc_list==rel_doc)[0]
+        if ind.size==0:
+            return -1
+        return ind[0]
         
     def kendall_tau(self,ranking,rankings,cumulative=None):
         ranking=ranking.reshape(-1,1)
@@ -229,11 +254,14 @@ class PIR(object):
         n_C=(partial>0).sum(axis=(0,1))
         n_D=(partial<0).sum(axis=(0,1))
         _,counts=np.unique(ranking,return_counts=True)
-        norm_factor=np.sqrt(rankings.shape[0]-(counts*(counts-1)).sum()/2)
+        
+        n_0=rankings.shape[0]*(rankings.shape[0]-1)/2
+
+        norm_factor=np.sqrt(n_0-(counts*(counts-1)).sum()/2)
         norm_factors=np.zeros(rankings.shape[1])
         for i in range(rankings.shape[1]):  
             _,counts=np.unique(rankings[:,i],return_counts=True)
-            norm_factors[i]=np.sqrt(rankings.shape[0]-(counts*(counts-1)).sum()/2)
+            norm_factors[i]=np.sqrt(n_0-(counts*(counts-1)).sum()/2)
         return (n_C-n_D)/(norm_factor*norm_factors)
     def rDG(self,rank,ranks,cumulative=None):
         '''
