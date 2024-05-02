@@ -90,7 +90,6 @@ class PIR(object):
         # user_id is the user id
         # doc_clicked_index is the index of the document clicked. From 0 (the best matching) to len(doc_ids)-1 (worst matching)
         # query_text is the query text.
-        print(self.logManager.getQueryText("q-5"))
         queryId,session,isUserOk=self.logManager.register_log(doc_ids, user_id, doc_clicked_index, query_text)
         if isUserOk:
             self.reranker.updateGraphFromClicks(user_id,session,queryId,doc_ids[doc_clicked_index])

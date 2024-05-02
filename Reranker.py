@@ -27,6 +27,7 @@ class Reranker(object):
             query_id: a string representing the query id. Possibly new.
             doc_id: a string representing the clicked document. Possibly new (wrt the graph, not the collection).
         '''
+        print("TODO:updateGraph")
     def rerank(self,query_id,user,retrieved_docs,retrieved_scores,session=None):
         '''
         Computes the reranking scores based on various arguments. 
