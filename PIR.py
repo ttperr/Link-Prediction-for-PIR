@@ -172,23 +172,25 @@ class PIR(object):
                 print("\nTau (mean):")
                 for i,met in enumerate(metrics):
                     print("\t",met,tau["log"][i]/count)
-
-                print("\n\nMetrics computed on",relevant_retrieved_by_ES,"validation samples in which ElasticSearch returned the relevant document (",(relevant_retrieved_by_ES/count),"% ).")
-                print("Top k recall (mean):")
-                print("\tk=\t",topKthresholds["ES"])
-                print("\t ES",topKrecall["ES"]["ES"]/relevant_retrieved_by_ES)
-                for i,met in enumerate(metrics):
-                    print(met,topKrecall["ES"]["metrics"][i,:]/relevant_retrieved_by_ES)
-                print("\nMean reciprocal rank:")
-                print("\t ES",RR["ES"]["ES"]/relevant_retrieved_by_ES)
-                for i,met in enumerate(metrics):
-                    print("\t",met,RR["ES"]["metrics"][i]/relevant_retrieved_by_ES)
-                print("\nrDG (mean):")
-                for i,met in enumerate(metrics):
-                    print("\t",met,rDG["ES"][i]/relevant_retrieved_by_ES)
-                print("\nTau (mean):")
-                for i,met in enumerate(metrics):
-                    print("\t",met,tau["ES"][i]/count)
+                if relevant_retrieved_by_ES>0:
+                    print("\n\nMetrics computed on",relevant_retrieved_by_ES,"validation samples in which ElasticSearch returned the relevant document (",(relevant_retrieved_by_ES/count),"% ).")
+                    print("Top k recall (mean):")
+                    print("\tk=\t",topKthresholds["ES"])
+                    print("\t ES",topKrecall["ES"]["ES"]/relevant_retrieved_by_ES)
+                    for i,met in enumerate(metrics):
+                        print(met,topKrecall["ES"]["metrics"][i,:]/relevant_retrieved_by_ES)
+                    print("\nMean reciprocal rank:")
+                    print("\t ES",RR["ES"]["ES"]/relevant_retrieved_by_ES)
+                    for i,met in enumerate(metrics):
+                        print("\t",met,RR["ES"]["metrics"][i]/relevant_retrieved_by_ES)
+                    print("\nrDG (mean):")
+                    for i,met in enumerate(metrics):
+                        print("\t",met,rDG["ES"][i]/relevant_retrieved_by_ES)
+                    print("\nTau (mean):")
+                    for i,met in enumerate(metrics):
+                        print("\t",met,tau["ES"][i]/count)
+                    else:
+                        print("\n\nElasticSearch never retrieved the relevant document, so no statistics can be computed.")
                 #print("Over the ",relevant_retrieved_by_ES,"(","{:.2f}".format(relevant_retrieved_by_ES/count),") times ES managed to retrieve the relevant doc, we have:")
         else:
             raise NotImplementedError("Unknown dataset")
