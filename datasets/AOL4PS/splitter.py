@@ -26,5 +26,5 @@ def validation_split():
                 val_f.write(line)
             else:
                 tr_f.write(line)
-            if(i==num_lines+1):
+            if(i==num_lines-1):
                 break
