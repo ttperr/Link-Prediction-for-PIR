@@ -32,12 +32,12 @@ class PIR(object):
         self.logManager= LogManager.LogManager(dataset)
         if validation:
             self.evaluation = Evaluation(self, [
-                # "user_document-shortest_distance",
-                # "user_document-weighted_shortest_distance",
+                "user_document-shortest_distance",
+                "user_document-weighted_shortest_distance",
                 "user_document-common_neighbors",
                 "user_document-adamic_adar",
-                # "user_document-page_rank",
-                # "user_document-prop_flow",
+                "user_document-page_rank",
+                "user_document-prop_flow",
             ])
             self.evaluation.proceed()
             self.evaluation.print()

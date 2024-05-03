@@ -21,7 +21,7 @@ class Evaluation(object):
         self.metrics = metrics
 
     def proceed(self) -> None:
-        test_sample=np.infty
+        test_sample=5 #TODO after testing it does not throw errors, set this to np.inf
         self.sample_size=0
         self.elastic_hits=0  
         #Indexed as RR/topKrecall[A][B]:
@@ -65,7 +65,7 @@ class Evaluation(object):
                     self.tau_computed["log"]=self.kendall_tau(np.arange(1,11),rankings,self.tau_computed["log"])
                     self.rDG_computed["log"]=self.rDG(rank_in_log,rankings[rank_in_log-1,:],self.rDG_computed["log"])
                     #Metrics computed on ES results
-                    if(ES_scores is not None):
+                    if(ES_scores.size!=0):
                         ES_ranking= self.compute_ranks_with_ties(ES_scores)
                         ind_ES=self.find_doc_index(ES_docs,relevant_doc)
                         if(ind_ES>0): #if the relevant doc is retrieved
@@ -83,7 +83,7 @@ class Evaluation(object):
                     if(self.sample_size>=test_sample):
                         break
 
-        top_k_columns = [f"top {k} recall" for k in self.top_K_thresholds["log"]]
+        top_k_columns = [f"top {k} rec" for k in self.top_K_thresholds["log"]]
         self.logs_results = pd.DataFrame(
             columns=["RR"] + top_k_columns + ["rDG", "tau"],
             index=self.metrics,
@@ -99,7 +99,7 @@ class Evaluation(object):
 
         if self.elastic_hits<1:
             return
-        top_k_columns = [f"top {k} recall" for k in self.top_K_thresholds["ES"]]
+        top_k_columns = [f"top {k} rec" for k in self.top_K_thresholds["ES"]]
         self.elastic_results = pd.DataFrame(
             columns=["RR"] + top_k_columns + ["rDG", "tau"],
             index=self.metrics,
@@ -110,8 +110,8 @@ class Evaluation(object):
                 self.tau_computed["ES"].reshape(-1, 1) # array metrics
             ))
         )
-        self.elastic_results.loc["reference"] = np.concatenate(([self.RR_computed["ES"]["ES"]], self.top_K_recall_computed["ES"]["ES"], [0, self.sample_size ]))
-        self.elastic_results = self.logs_results / self.sample_size
+        self.elastic_results.loc["reference"] = np.concatenate(([self.RR_computed["ES"]["ES"]], self.top_K_recall_computed["ES"]["ES"], [0, self.elastic_hits ]))
+        self.elastic_results = self.elastic_results / self.elastic_hits
 
     def print(self) -> None:
         print(tabulate(self.logs_results, tablefmt="md", floatfmt=".4f", headers=self.logs_results.columns))
@@ -119,7 +119,7 @@ class Evaluation(object):
         if self.elastic_hits<1:
             print("\n\nElasticSearch never retrieved the relevant document, so no statistics can be computed.")
             return
-        print(tabulate(self.elastic_results, tablefmt="md", floatfmt=".4f", headers=self.logs_results.columns))
+        print(tabulate(self.elastic_results, tablefmt="md", floatfmt=".4f", headers=self.elastic_results.columns))
 
     def store(self) -> None:
         data = {
@@ -163,6 +163,8 @@ class Evaluation(object):
                     score=scores[j,i]
                 ranks[j,i]=t
                 r+=1
+        if ranks.shape[1]==1:
+            ranks=ranks.reshape(-1)
         return ranks
 
     def find_doc_index(self,doc_list,rel_doc):
@@ -176,7 +178,6 @@ class Evaluation(object):
         Returns:
             ind: an int representing the index of rel_doc in doc_list. -1 if not present.
         '''
-        
         ind=np.nonzero(doc_list==rel_doc)[0]
         if ind.size==0:
             return -1
