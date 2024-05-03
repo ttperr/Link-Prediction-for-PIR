@@ -20,7 +20,7 @@ class Evaluation(object):
         self.metrics = metrics
 
     def proceed(self) -> None:
-        test_sample=2 #TODO remove
+        test_sample=np.infty #TODO remove
         self.sample_size=0
         self.elastic_search_hits=0  
         #Indexed as RR/topKrecall[A][B]:
@@ -31,7 +31,7 @@ class Evaluation(object):
         #tau/rDG[A], where A refers to the order it is compared with and the set of documents.
         self.tau_computed={"ES":None,"log":None}
         self.rDG_computed={"log":None,"ES":None}
-        self.top_K_thresholds={"log":np.array([1,3,5,10]),"ES":np.array([1,3,5,10,25,100,150])}
+        self.top_K_thresholds={"log":np.arange(1, 11),"ES":np.array([1,3,5,10,25,100,150])}
         if self.pir.dataset=="AOL":
             with open('datasets/AOL4PS/validation_data.csv') as f:
                 reader = csv.reader(f, delimiter='\t')
@@ -49,9 +49,14 @@ class Evaluation(object):
                     queryText=self.pir.logManager.getQueryText(queryId)
                     user=row[0]
                     self.sample_size+=1
+                    ES_docs,ES_scores=self.pir.clean_query(self.pir.query_es(queryText,250))
+                    if ES_docs is None:
+                        ES_docs,ES_scores=np.array(()), np.array(())
+                    docs_to_rank, reference_scores = np.concatenate((np.array(log_rankings), ES_docs)), np.concatenate((np.zeros(len(log_rankings)), ES_scores))
+                    scores=self.pir.reranker.evaluation_metrics_scores(queryId,user,docs_to_rank, reference_scores,session, metrics=self.metrics)
                     #Metrics computed on logs resulst only
-                    scores=self.pir.reranker.evaluation_metrics_scores(queryId,user,np.array(log_rankings),np.ones(len(log_rankings)),session)
-                    rankings=self.compute_ranks_with_ties(scores)
+                    logs_scores = scores[:len(log_rankings)]
+                    rankings=self.compute_ranks_with_ties(logs_scores)
                     self.RR_computed["log"]["log"]=self.RR(rank_in_log,cumulative=self.RR_computed["log"]["log"])
                     self.RR_computed["log"]["metrics"]=self.RR(rankings[rank_in_log-1,:],cumulative=self.RR_computed["log"]["metrics"])
                     self.top_K_recall_computed["log"]["log"]=self.top_k_recall(rank_in_log,cumulative=self.top_K_recall_computed["log"]["log"],thresholds=self.top_K_thresholds["log"])
@@ -59,7 +64,6 @@ class Evaluation(object):
                     self.tau_computed["log"]=self.kendall_tau(np.arange(1,11),rankings,self.tau_computed["log"])
                     self.rDG_computed["log"]=self.rDG(rank_in_log,rankings[rank_in_log-1,:],self.rDG_computed["log"])
                     #Metrics computed on ES results
-                    ES_docs,ES_scores=self.pir.clean_query(self.pir.query_es(queryText,250))
                     if(ES_scores is not None):
                         ES_ranking= self.compute_ranks_with_ties(ES_scores)
                         ind_ES=self.find_doc_index(ES_docs,relevant_doc)
@@ -67,8 +71,8 @@ class Evaluation(object):
                             rank_in_ES=ES_ranking[ind_ES]
                             self.elastic_search_hits+=1
                             #TODO: metrics considering the ES score and comparing reranking with initial ES
-                            scores=self.pir.reranker.evaluation_metrics_scores(queryId,user,ES_docs,ES_scores,session)
-                            rankings=self.compute_ranks_with_ties(scores)
+                            elastic_search_metrics = scores[len(log_rankings):]
+                            rankings=self.compute_ranks_with_ties(elastic_search_metrics)
                             self.RR_computed["ES"]["ES"]=self.RR(rank_in_ES,cumulative=self.RR_computed["ES"]["ES"])
                             self.RR_computed["ES"]["metrics"]=self.RR(rankings[ind_ES,:],cumulative=self.RR_computed["ES"]["metrics"])
                             self.top_K_recall_computed["ES"]["ES"]=self.top_k_recall(rank_in_ES,cumulative=self.top_K_recall_computed["ES"]["ES"],thresholds=self.top_K_thresholds["ES"])
