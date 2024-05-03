@@ -114,11 +114,12 @@ class Evaluation(object):
         self.elastic_results = self.elastic_results / self.elastic_hits
 
     def print(self) -> None:
+        print("Results over "+str(self.sample_size)+" evaluation samples.")
         print(tabulate(self.logs_results, tablefmt="md", floatfmt=".4f", headers=self.logs_results.columns))
-
         if self.elastic_hits<1:
             print("\n\nElasticSearch never retrieved the relevant document, so no statistics can be computed.")
             return
+        print("Results over "+str(self.elastic_hits)+" evaluation samples in which ES retrieves the relevant document.")
         print(tabulate(self.elastic_results, tablefmt="md", floatfmt=".4f", headers=self.elastic_results.columns))
 
     def store(self) -> None:
