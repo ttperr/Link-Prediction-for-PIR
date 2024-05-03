@@ -8,9 +8,7 @@ def validation_split():
         print("Existing validation split found.")
         return
     np.random.seed(143)
-    num_lines=0
-    with open(directory+"/data.csv", "rb") as f: #faster to do outside since we can use rb mode
-        num_lines = sum(1 for _ in f)
+    num_lines=1339102
     print("Found",num_lines,"training log samples")
     val_array=np.full(num_lines-1,False,dtype=bool)
     val_array[:10000]=True
@@ -28,3 +26,5 @@ def validation_split():
                 val_f.write(line)
             else:
                 tr_f.write(line)
+            if(i==num_lines+1):
+                break
