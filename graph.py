@@ -54,11 +54,15 @@ class Graph(object):
         return self.nx_graph.degree[node]
 
     def shortest_distance(self, start, targets):
+        if not self.nx_graph.has_node(start):
+            return np.zeros(shape=(len(targets)))
         lengths = nx.shortest_path_length(self.nx_graph, start, weight=lambda u,v,e: 1/e.get('weight', 0))
         return np.array([lengths.get(arrival, 0) + EPSILON for arrival in targets])
 
     def weighted_shortest_distance(self, start, targets):
         """Each edge is weighted by the degree of arrival node. Going to a more popular node is less significant"""
+        if not self.nx_graph.has_node(start):
+            return np.zeros(shape=(len(targets)))
         lengths = nx.shortest_path_length(self.nx_graph, start, weight=lambda u,v,e: self.nx_graph.degree(v)/e.get('weight', 0))
         return np.array([lengths.get(arrival, 0) + EPSILON for arrival in targets])
 
@@ -108,10 +112,14 @@ class Graph(object):
         return res
     
     def rooted_page_rank(self, root_node, target_nodes):
+        if not self.nx_graph.has_node(root_node):
+            return np.zeros(shape=(len(target_nodes)))
         pagerank_scores = nx.pagerank(self.nx_graph, weight='weight', personalization={root_node: 1})
         return np.array([pagerank_scores.get(node, 0) + EPSILON for node in target_nodes])
 
     def prop_flow(self, source_node, targets, max_length:int=5):
+        if not self.nx_graph.has_node(source_node):
+            return np.zeros(shape=(len(targets)))
         visit_probability = {source_node: 1.0}  
         for step in range(max_length):
             next_visit_probability = {}

@@ -14,8 +14,17 @@ class Reranker(object):
             #YOU SHOULD LOAD VARIABLES/USEFUL INFO FROM LOGS OR A FILE STORING THEM (IF YOU USE FILES, STORE THEM IN THE CORRECT FOLDER)
             #THE FOLDER with data and files needed to rerank SHOULD BE in  AOL4PS/ 
             self.user_document = Graph(0, 5, self.validation, dataset=self.dataset, name="user-document")
+            self.UD_metrics = {}
             # self.query_document = Graph(1, 5, self.validation, dataset=self.dataset, name="query-document")
             # self.query_user= Graph(1, 0, self.validation, dataset=self.dataset, name="query-user")
+            self.METRICS = {
+                "user_document-shortest_distance": self.user_document.shortest_distance,
+                "user_document-weighted_shortest_distance": self.user_document.weighted_shortest_distance,
+                "user_document-common_neighbors": self.user_document.common_neighbors_metric,
+                "user_document-adamic_adar": self.user_document.adamic_adar_metric,
+                "user_document-page_rank": self.user_document.rooted_page_rank,
+                "user_document-prop_flow": self.user_document.prop_flow,
+            }
         else:
             raise NotImplementedError("Unknown dataset")
     def updateGraphFromClicks(self,user_id,session,query_id,doc_id):
@@ -48,41 +57,31 @@ class Reranker(object):
         '''
         if len(retrieved_docs) == 0:
             return None
-        self.compute_metrics(user, retrieved_docs)
+
+        self.compute_UD_metrics(user, retrieved_docs)
         return self.mix_scores(
             (retrieved_scores, 1),
-            # (self.UD_shortest_distance, 1),
-            # (self.UD_weighted_shortest_distance, 1),
-            (self.UD_common_neighbors, 1),
-            (self.UD_adamic_adar, 1),
-            # (self.UD_page_rank, 1),
-            # (self.UD_prop_flow, 1)
+            (self.UD_metrics["user_document-shortest_distance"], 1),
+            (self.UD_metrics["user_document-weighted_shortest_distance"], 1),
+            (self.UD_metrics["user_document-common_neighbors"], 1),
+            (self.UD_metrics["user_document-adamic_adar"], 1),
+            (self.UD_metrics["user_document-page_rank"], 1),
+            (self.UD_metrics["user_document-prop_flow"], 1)
         )
-
-    def compute_metrics(self, user, retrieved_docs, progress=False):
+    
+    def compute_UD_metrics(self, user, retrieved_docs, progress=False, metrics="all"):
         time_start = time.time()
-        # if progress:
-        #     print("Computing user-document metrics\nshortest distance...", end="")
-        # self.UD_shortest_distance = np.reciprocal(self.user_document.shortest_distance(user, retrieved_docs))
-        # if progress:
-        #     print("done\nweighted shortest distance...", end="")
-        # self.UD_weighted_shortest_distance = np.reciprocal(self.user_document.weighted_shortest_distance(user, retrieved_docs))
-        if progress:
-            print("done\ncommon neighbors...", end="")
-        self.UD_common_neighbors = self.user_document.common_neighbors_metric(user, retrieved_docs)
-        if progress:
-            print("done\nadamic adar...", end="")
-        self.UD_adamic_adar = self.user_document.adamic_adar_metric(user, retrieved_docs)
-        # if progress:
-        #     print("done\npage rank...", end="")
-        # self.UD_page_rank = self.user_document.rooted_page_rank(user, retrieved_docs)
-        # if progress:
-        #     print("done\nprop flow...", end="")
-        # self.UD_prop_flow = self.user_document.prop_flow(user, retrieved_docs)
-        if progress:
-            print(f"done\nComputations took {time.time()-time_start}s")
+        if metrics == "all":
+            metrics = list(self.METRICS.keys())
 
-    def evaluation_metrics_scores(self,query_id,user,retrieved_docs,retrieved_scores,session=None):
+        if progress: print("Computing user-document metrics")
+        for metric in metrics:
+            if progress: print(metric + "...", end="")
+            self.UD_metrics[metric] = self.METRICS.get(metric)(user, retrieved_docs)
+            if progress: print("done")
+        if progress: print(f"Computations took {time.time()-time_start}s")
+
+    def evaluation_metrics_scores(self,query_id,user,retrieved_docs,retrieved_scores,session=None, metrics="all"):
         '''
         Computes reranking scores based on all metrics chosen for evaluation.
 
@@ -92,31 +91,17 @@ class Reranker(object):
             retrieved_docs: a np.array of strings, representing the doc ids.
             retrieved_scores: a np.array of floats, containing the scores given by ElasticSearch. Index is the same as the docs. May be unsorted.
             session: a string containing the session id. Must support None, i.e. when the sesion is not provided.
+            metrics: a np.array containing the unique name of the metrics.
         Returns:
-            reranked_scores: a np.array of the shape n_docs x metrics, containing the score for each doc.
-            metrics: a np.array containing the unique name of the metrics. Must have the same order as the rows of reranked_scores. 
+            reranked_scores: a np.array of the shape n_docs x metrics, containing the score for each doc. Must have the same order as the rows of metrics. 
         '''
         if len(retrieved_docs) == 0:
             return None
-        self.compute_metrics(user, retrieved_docs)
-        return (
-            np.transpose(np.matrix([
-                # self.UD_shortest_distance,
-                # self.UD_weighted_shortest_distance,
-                self.UD_common_neighbors,
-                self.UD_adamic_adar,
-                # self.UD_page_rank,
-                # self.UD_prop_flow
-            ])),
-            np.array([
-                # "user_document-shortest_distance",
-                # "user_document-weighted_shortest_distance",
-                "user_document-common_neighbors",
-                "user_document-adamic_adar",
-                # "user_document-page_rank",
-                # "user_document-prop_flow",
-            ])
-        )
+        if metrics == "all":
+            metrics = list(self.METRICS.keys())
+        self.compute_UD_metrics(user, retrieved_docs, metrics=metrics)
+        return np.transpose(np.matrix([self.UD_metrics[metric] for metric in metrics]))
+        
 
     def is_new_user(self,userID): #TODO
         #Must return true if the userId is new, false if it is known

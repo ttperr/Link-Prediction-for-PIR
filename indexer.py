@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 import connector
 
-csv.field_size_limit(100000)
+csv.field_size_limit(100000000)
 
 
 def index_in_elasticsearch(dataset):
