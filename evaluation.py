@@ -1,5 +1,6 @@
 
 import csv
+import json
 import numpy as np
 import pandas as pd
 import scipy
@@ -20,9 +21,9 @@ class Evaluation(object):
         self.metrics = metrics
 
     def proceed(self) -> None:
-        test_sample=np.infty #TODO remove
+        test_sample=np.infty
         self.sample_size=0
-        self.elastic_search_hits=0  
+        self.elastic_hits=0  
         #Indexed as RR/topKrecall[A][B]:
         #   -A determines on which set of documnet the metric is computed
         #   -B determines on which ranking
@@ -69,7 +70,7 @@ class Evaluation(object):
                         ind_ES=self.find_doc_index(ES_docs,relevant_doc)
                         if(ind_ES>0): #if the relevant doc is retrieved
                             rank_in_ES=ES_ranking[ind_ES]
-                            self.elastic_search_hits+=1
+                            self.elastic_hits+=1
                             #TODO: metrics considering the ES score and comparing reranking with initial ES
                             elastic_search_metrics = scores[len(log_rankings):]
                             rankings=self.compute_ranks_with_ties(elastic_search_metrics)
@@ -82,10 +83,8 @@ class Evaluation(object):
                     if(self.sample_size>=test_sample):
                         break
 
-    def print(self) -> None:
-        # log only
         top_k_columns = [f"top {k} recall" for k in self.top_K_thresholds["log"]]
-        logs_results = pd.DataFrame(
+        self.logs_results = pd.DataFrame(
             columns=["RR"] + top_k_columns + ["rDG", "tau"],
             index=self.metrics,
             data=np.hstack((
@@ -95,15 +94,13 @@ class Evaluation(object):
                 self.tau_computed["log"].reshape(-1, 1) # array metrics
             ))
         )
-        logs_results.loc["reference"] = np.concatenate(([self.RR_computed["log"]["log"]], self.top_K_recall_computed["log"]["log"], [0, self.sample_size]))
-        logs_results = logs_results / self.sample_size
-        print(tabulate(logs_results, tablefmt="md", floatfmt=".4f", headers=logs_results.columns))
+        self.logs_results.loc["reference"] = np.concatenate(([self.RR_computed["log"]["log"]], self.top_K_recall_computed["log"]["log"], [0, self.sample_size]))
+        self.logs_results = self.logs_results / self.sample_size
 
-        if self.elastic_search_hits<1:
-            print("\n\nElasticSearch never retrieved the relevant document, so no statistics can be computed.")
+        if self.elastic_hits<1:
             return
         top_k_columns = [f"top {k} recall" for k in self.top_K_thresholds["ES"]]
-        logs_results = pd.DataFrame(
+        self.elastic_results = pd.DataFrame(
             columns=["RR"] + top_k_columns + ["rDG", "tau"],
             index=self.metrics,
             data=np.hstack((
@@ -113,9 +110,28 @@ class Evaluation(object):
                 self.tau_computed["ES"].reshape(-1, 1) # array metrics
             ))
         )
-        logs_results.loc["reference"] = np.concatenate(([self.RR_computed["ES"]["ES"]], self.top_K_recall_computed["ES"]["ES"], [0, self.sample_size ]))
-        logs_results = logs_results / self.sample_size
-        print(tabulate(logs_results, tablefmt="md", floatfmt=".4f", headers=logs_results.columns))
+        self.elastic_results.loc["reference"] = np.concatenate(([self.RR_computed["ES"]["ES"]], self.top_K_recall_computed["ES"]["ES"], [0, self.sample_size ]))
+        self.elastic_results = self.logs_results / self.sample_size
+
+    def print(self) -> None:
+        print(tabulate(self.logs_results, tablefmt="md", floatfmt=".4f", headers=self.logs_results.columns))
+
+        if self.elastic_hits<1:
+            print("\n\nElasticSearch never retrieved the relevant document, so no statistics can be computed.")
+            return
+        print(tabulate(self.elastic_results, tablefmt="md", floatfmt=".4f", headers=self.logs_results.columns))
+
+    def store(self) -> None:
+        data = {
+            "sample size": self.sample_size,
+            "logs results": json.loads(self.logs_results.to_json()),
+        }
+        if self.elastic_hits>0:
+            data["elastic search hits"] = self.elastic_hits
+            data["elastic search results"] = json.loads(self.elastic_results.to_json())
+        
+        with open("evaluation_results.json", "w") as file:
+            file.write(json.dumps(data))
 
     def plot(self) -> None:
         pass

@@ -388,3 +388,5 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/java,intellij+all,python,macos,windows,linux,visualstudiocode
 connecter.py
+
+evaluation_results.json
