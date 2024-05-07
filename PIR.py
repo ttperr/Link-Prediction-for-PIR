@@ -27,7 +27,6 @@ class PIR(object):
 
         self.client = connector.establish_connection()
 
-        # In future we can add flags initializing different rerankers (graph, contents,...)
         self.reranker = Reranker.Reranker(dataset, validation)
         self.logManager= LogManager.LogManager(dataset)
         if validation:
@@ -48,7 +47,6 @@ class PIR(object):
 
     def query(self, search_text, user):
         results = self.query_es(search_text)
-        # print(results)
         docs,scores = self.clean_query(results)
         print("ElasticSearch results (ordered, top 10)")
         print(docs[:min(10,scores.shape[0]-1)],scores[:min(10,scores.shape[0]-1)])
@@ -62,7 +60,6 @@ class PIR(object):
         reranked_docs=docs[np.argsort(-reranked_scores)]
         out_results = []
         if self.dataset == "AOL":
-            # FASTER ways to do it, but since we have few results this is fine.
             for new_pos in range(len(docs)):
                 for old_pos in range(len(docs)):
                     if (reranked_docs[new_pos] == docs[old_pos]):
@@ -70,7 +67,6 @@ class PIR(object):
                         out_results.append(
                             (old_pos-new_pos, doc["_id"], doc["_source"]["url"], doc["_source"]["title"]))
                         break
-            # return sorted list of (difference in rank, docID,bold_title,regular_description) for AOL
             return out_results
         return None
 

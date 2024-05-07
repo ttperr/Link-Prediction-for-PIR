@@ -138,11 +138,8 @@ class Ui_Widget(object):
         self.lineEdit_2.returnPressed.connect(self.update_user)
         self.lineEdit_2.textEdited.connect(self.update_user)
         self.last_query_results=[]
-        #self.textEdit.selectionChanged.connect(self.selected_doc)
 
     def run_query(self):
-        #print(self.lineEdit.text())
-        #print(self.lineEdit_2.text())
         if(self.lineEdit_2.text()==""):
             self.lineEdit_2.setStyleSheet("color:red;")
             print("No user selected. Run again after selecting a user.")
@@ -173,10 +170,8 @@ class Ui_Widget(object):
         else:
             self.lineEdit_2.setStyleSheet("color:black;")
             return
-        #print(self.lineEdit_2.text())
         if(self.PIR.is_new_user(self.lineEdit_2.text())):
             self.lineEdit_2.setStyleSheet("color:green;")
-            #print("New user!")
         else:
             self.lineEdit_2.setStyleSheet("color:black;")
     def register_click(self,res_ind):

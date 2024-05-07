@@ -88,7 +88,6 @@ class LogManager(object):
             doc_clicked_index=9
         docs="\t".join(top_ten_docs)
         line=f'\n{user_id}\t{queryId}\t{timestamp}\t{sessionId}\t{top_ten_docs[doc_clicked_index]}\t\"{docs}\"\t{doc_clicked_index}'
-        #print(line)
         with open("datasets/AOL4PS/data.csv","a") as f:
                 f.write(line)
         return queryId,str(sessionId),True
