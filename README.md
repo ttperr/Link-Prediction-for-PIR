@@ -7,7 +7,17 @@ Private repo of the DD2477 - Search Engines and Information Retrieval Systems pr
 The data used in this project can be found and downloaded [here](https://www.scidb.cn/en/detail?dataSetId=5246eba9ec8d4519aa4f0d8f9f092d4b#p4).
 
 ## Connect to ElasticSearch
-Update the values in the file ```connector.py```, inserting your password and other fields needed to setup a connection. Multiple options are possible, see ElasticSearch documentation [here](https://www.elastic.co/guide/en/elasticsearch/client/python-api/current/connecting.html).
+Create the file ```connector.py```, which should follow this template 
+```
+from elasticsearch import Elasticsearch
+
+def establish_connection():
+    return Elasticsearch('https://localhost:9200',
+                           basic_auth=("elastic","YOUR PASSWORD HERE"),
+                           ssl_assert_fingerprint="YOUR SSL KEY HERE")
+```
+
+Use the values you get when performing your installation. Multiple connetcion options are possible, see ElasticSearch documentation [here](https://www.elastic.co/guide/en/elasticsearch/client/python-api/current/connecting.html).
 
 
 ## Running
