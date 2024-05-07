@@ -19,6 +19,8 @@ def establish_connection():
 
 Use the values you get when performing your installation. Multiple connetcion options are possible, see ElasticSearch documentation [here](https://www.elastic.co/guide/en/elasticsearch/client/python-api/current/connecting.html).
 
+## Python packages
+Before running the code, be sure to have the required Python Packages. The complete list is in ```requirements.txt```.
 
 ## Running
 To run the code run from the terminal you need to launch an docker instance of [**Elastic Search**](https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html) and run **``PIR.py``** file. \
