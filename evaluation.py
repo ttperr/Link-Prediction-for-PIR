@@ -3,7 +3,6 @@ import csv
 import json
 import numpy as np
 import pandas as pd
-import scipy
 from tabulate import tabulate
 from tqdm import tqdm
 
@@ -21,7 +20,8 @@ class Evaluation(object):
         self.metrics = metrics
 
     def proceed(self) -> None:
-        test_sample=5 #TODO after testing it does not throw errors, set this to np.inf
+        #Evaluation can be long to execute. Put a smaller value for test_sample if you want to limit the samples on which metrics are computed.
+        test_sample=np.inf 
         self.sample_size=0
         self.elastic_hits=0  
         #Indexed as RR/topKrecall[A][B]:
@@ -71,7 +71,6 @@ class Evaluation(object):
                         if(ind_ES>0): #if the relevant doc is retrieved
                             rank_in_ES=ES_ranking[ind_ES]
                             self.elastic_hits+=1
-                            #TODO: metrics considering the ES score and comparing reranking with initial ES
                             elastic_search_metrics = scores[len(log_rankings):]
                             rankings=self.compute_ranks_with_ties(elastic_search_metrics)
                             self.RR_computed["ES"]["ES"]=self.RR(rank_in_ES,cumulative=self.RR_computed["ES"]["ES"])
@@ -150,7 +149,6 @@ class Evaluation(object):
         '''
         if(scores.ndim<2):
             scores=scores.reshape(-1,1)
-        # return scipy.stats.rankdata(-scores, axis=1, method="min")
         ranks=np.zeros(scores.shape,dtype=np.int32)
         arg_ranks=np.argsort(-scores,axis=0)
         for i in range(scores.shape[1]):
@@ -188,14 +186,6 @@ class Evaluation(object):
         ranking=ranking.reshape(-1,1)
         if rankings.ndim<2:
             rankings=rankings.reshape(-1,1)
-        '''
-        n_c=np.zeros(rankings.shape[1])
-        n_d=np.zeros(rankings.shape[1])
-        for d in range(ranking.shape[0]-1):
-            partial= (ranking[d+1:,:]-ranking[d,:]) * (rankings[d+1:,:]-rankings[d,:])
-            n_c+=(partial >0).sum(axis=0)
-            n_d+=(partial<0).sum(axis=0)
-        '''
         partial=(np.expand_dims(ranking,0)-np.expand_dims(ranking,1))*(np.expand_dims(rankings,0)-np.expand_dims(rankings,1))
         n_C=(partial>0).sum(axis=(0,1))
         n_D=(partial<0).sum(axis=(0,1))
