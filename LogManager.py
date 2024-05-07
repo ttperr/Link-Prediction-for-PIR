@@ -79,7 +79,7 @@ class LogManager(object):
         if isQueryNew:
             print("New query detected")
             with open("datasets/AOL4PS/query.csv","a") as f:
-                f.write("\n"+query_text+"\t"+queryId)
+                f.write(query_text+"\t"+queryId+"\n")
                 pass
         top_ten_docs=doc_ids[:10]
         timestamp=datetime.datetime.now().replace(microsecond=0)
@@ -87,7 +87,7 @@ class LogManager(object):
             top_ten_docs[9]=doc_ids[doc_clicked_index]
             doc_clicked_index=9
         docs="\t".join(top_ten_docs)
-        line=f'\n{user_id}\t{queryId}\t{timestamp}\t{sessionId}\t{top_ten_docs[doc_clicked_index]}\t\"{docs}\"\t{doc_clicked_index}'
+        line=f'{user_id}\t{queryId}\t{timestamp}\t{sessionId}\t{top_ten_docs[doc_clicked_index]}\t\"{docs}\"\t{doc_clicked_index}\n'
         with open("datasets/AOL4PS/data.csv","a") as f:
                 f.write(line)
         return queryId,str(sessionId),True
